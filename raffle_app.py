@@ -230,7 +230,66 @@ def run_app():
     # Load history on startup
     load_winner_history()
 
-    st.markdown("<h1 style='text-align: center; font-size: 4em; color: #FFD700;'>🎊 The MVN Great Save Raffle 🎊</h1>", unsafe_allow_html=True)
+    # Logo section
+    if 'logo_image' not in st.session_state:
+        st.session_state.logo_image = None
+    
+    # Logo display in corners
+    if st.session_state.logo_image is not None:
+        logo_base64 = base64.b64encode(st.session_state.logo_image).decode()
+        st.markdown(
+            f"""
+            <style>
+            .logo-corner {{
+                position: fixed;
+                top: 20px;
+                width: 80px;
+                height: 80px;
+                z-index: 1000;
+                opacity: 0.9;
+            }}
+            .logo-left {{
+                left: 20px;
+            }}
+            .logo-right {{
+                right: 20px;
+            }}
+            </style>
+            <img src="data:image/png;base64,{logo_base64}" class="logo-corner logo-left">
+            <img src="data:image/png;base64,{logo_base64}" class="logo-corner logo-right">
+            """,
+            unsafe_allow_html=True
+        )
+
+    # MVN Logo header
+    col1, col2, col3 = st.columns([1, 3, 1])
+    
+    with col1:
+        # Load local logo file
+        try:
+            logo_image = Image.open("Moon Valley Logo.png")
+            st.image(logo_image, width=100)
+        except FileNotFoundError:
+            st.markdown("""
+            <div style='background: #4ecdc4; color: white; padding: 10px; border-radius: 10px; text-align: center; font-weight: bold;'>
+                MVN<br/>CORP
+            </div>
+            """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("<h1 style='text-align: center; font-size: 4em; color: #FFD700;'>🎊 The MVN Great Save Raffle 🎊</h1>", unsafe_allow_html=True)
+    
+    with col3:
+        # Same logo for right side
+        try:
+            logo_image = Image.open("Moon Valley Logo.png")
+            st.image(logo_image, width=100)
+        except FileNotFoundError:
+            st.markdown("""
+            <div style='background: #4ecdc4; color: white; padding: 10px; border-radius: 10px; text-align: center; font-weight: bold;'>
+                MVN<br/>CORP
+            </div>
+            """, unsafe_allow_html=True)
     
     # Create tabs
     tab1, tab2, tab3 = st.tabs(["🎰 Raffle Draw", "🏆 Hall of Fame", "📊 Leaderboard"])
