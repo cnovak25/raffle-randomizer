@@ -244,17 +244,17 @@ def run_app():
             uploaded_excel = st.file_uploader("📊 Upload Excel/CSV file", type=["xlsx", "csv"])
             
             # Sample CSV download
-            sample_csv = """Name,Photo
-John Doe,https://example.com/john_doe.jpg
-Jane Smith,https://example.com/jane_smith.jpg
-Bob Johnson,https://example.com/bob_johnson.jpg"""
+            sample_csv = """Name,Photo,Prize_Level,Location
+John Doe,https://example.com/john_doe.jpg,Red Ticket - Monthly Prize,New York Office
+Jane Smith,https://example.com/jane_smith.jpg,Green Ticket - Quarterly Prize,Chicago Branch
+Bob Johnson,https://example.com/bob_johnson.jpg,Gold Ticket - Annual Prize,Remote - California"""
             
             st.download_button(
                 label="📥 Download Sample CSV Template",
                 data=sample_csv,
                 file_name="sample_participants.csv",
                 mime="text/csv",
-                help="Download this template. Photo column can contain URLs or local filenames."
+                help="Download this template. Add Prize_Level column to specify ticket color and prize type."
             )
             
         with col2:
@@ -348,18 +348,27 @@ Bob Johnson,https://example.com/bob_johnson.jpg"""
                 
                 # Check for required columns
                 required_cols = ["Name"]
-                optional_cols = ["Photo"]
+                optional_cols = ["Photo", "Prize_Level", "Location"]
                 missing_required = [col for col in required_cols if col not in df.columns]
                 
                 if missing_required:
                     st.error(f"❌ Missing required column(s): {', '.join(missing_required)}")
                     st.info(f"📋 Found columns: {', '.join(df.columns.tolist())}")
-                    st.info("💡 Make sure your file has at least a 'Name' column. 'Photo' column is optional.")
+                    st.info("💡 Required: 'Name' | Optional: 'Photo', 'Prize_Level', 'Location'")
                 else:
-                    # Add Photo column if missing (optional)
+                    # Add missing optional columns
                     if "Photo" not in df.columns:
                         df["Photo"] = ""  # Empty photo column
                         st.warning("📸 No 'Photo' column found - participants will appear without photos")
+                    
+                    if "Prize_Level" not in df.columns:
+                        df["Prize_Level"] = ""  # Empty prize level column
+                        st.warning("🎫 No 'Prize_Level' column found - no prize categories will be shown")
+                    
+                    if "Location" not in df.columns:
+                        df["Location"] = ""  # Empty location column
+                        st.warning("📍 No 'Location' column found - no location will be shown")
+                        st.info("🎟️ No 'Prize_Level' column found - using default prize display")
                     st.success(f"🎪 Loaded {len(df)} participants!")
                     
                     # Countdown settings
@@ -406,10 +415,14 @@ Bob Johnson,https://example.com/bob_johnson.jpg"""
                             winner_row = df.sample(1).iloc[0]
                             winner_name = winner_row['Name']
                             winner_photo = winner_row['Photo']
+                            winner_prize_level = winner_row.get('Prize_Level', '')
+                            winner_location = winner_row.get('Location', '')
                             
                             # Add to history
                             winner_entry = {
                                 'name': winner_name,
+                                'prize_level': winner_prize_level,
+                                'location': winner_location,
                                 'date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                                 'drawn_by': st.session_state.get('username', 'cnovak25')
                             }
@@ -428,6 +441,7 @@ Bob Johnson,https://example.com/bob_johnson.jpg"""
                             # Winner announcement
                             winner_container = st.container()
                             with winner_container:
+                                # Main winner announcement
                                 st.markdown(
                                     f"""
                                     <div class='mega-winner'>
@@ -438,6 +452,51 @@ Bob Johnson,https://example.com/bob_johnson.jpg"""
                                     """,
                                     unsafe_allow_html=True
                                 )
+                                
+                                # Display prize level and location info
+                                col1, col2 = st.columns(2)
+                                
+                                with col1:
+                                    if winner_prize_level:
+                                        # Color code the prize levels
+                                        if "Red" in winner_prize_level:
+                                            prize_color = "#FF4444"
+                                            prize_emoji = "🔴"
+                                        elif "Green" in winner_prize_level:
+                                            prize_color = "#44FF44"
+                                            prize_emoji = "🟢"
+                                        elif "Gold" in winner_prize_level:
+                                            prize_color = "#FFD700"
+                                            prize_emoji = "🟡"
+                                        else:
+                                            prize_color = "#888888"
+                                            prize_emoji = "🎫"
+                                        
+                                        st.markdown(
+                                            f"""
+                                            <div style='text-align: center; padding: 20px; background: linear-gradient(45deg, {prize_color}22, {prize_color}44); border-radius: 15px; margin: 10px;'>
+                                                <h3 style='color: {prize_color}; margin: 0;'>{prize_emoji} Prize Level</h3>
+                                                <h2 style='color: {prize_color}; margin: 5px 0;'>{winner_prize_level}</h2>
+                                            </div>
+                                            """,
+                                            unsafe_allow_html=True
+                                        )
+                                    else:
+                                        st.info("🎫 No prize level specified")
+                                
+                                with col2:
+                                    if winner_location:
+                                        st.markdown(
+                                            f"""
+                                            <div style='text-align: center; padding: 20px; background: linear-gradient(45deg, #4ecdc422, #4ecdc444); border-radius: 15px; margin: 10px;'>
+                                                <h3 style='color: #4ecdc4; margin: 0;'>📍 Location</h3>
+                                                <h2 style='color: #4ecdc4; margin: 5px 0;'>{winner_location}</h2>
+                                            </div>
+                                            """,
+                                            unsafe_allow_html=True
+                                        )
+                                    else:
+                                        st.info("📍 No location specified")
                                 
                                 # Display photo with URL support
                                 st.markdown("### 📸 Winner Photo")
@@ -518,11 +577,16 @@ Bob Johnson,https://example.com/bob_johnson.jpg"""
                                   reverse=True)
             
             for idx, winner in enumerate(sorted_history[:10]):  # Show last 10 winners
+                prize_level = winner.get('prize_level', '')
+                location = winner.get('location', '')
+                
                 st.markdown(
                     f"""
                     <div class='winner-card'>
                         <h3 style='color: #FFD700; margin: 0;'>🏆 {winner['name']}</h3>
                         <p style='margin: 5px 0; color: #666;'>Won on: {winner['date']}</p>
+                        {f"<p style='margin: 5px 0; color: #4ecdc4; font-weight: bold;'>🎫 {prize_level}</p>" if prize_level else ""}
+                        {f"<p style='margin: 5px 0; color: #45b7d1;'>📍 {location}</p>" if location else ""}
                         <p style='margin: 5px 0; color: #888; font-size: 0.9em;'>Drawn by: {winner.get('drawn_by', 'Unknown')}</p>
                     </div>
                     """,
