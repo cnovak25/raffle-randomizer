@@ -304,9 +304,9 @@ def run_app():
             
             # Sample CSV download
             sample_csv = """Name,Photo,Prize_Level,Location
-John Doe,https://example.com/john_doe.jpg,Red Ticket - Monthly Prize,New York Office
-Jane Smith,https://example.com/jane_smith.jpg,Green Ticket - Quarterly Prize,Chicago Branch
-Bob Johnson,https://example.com/bob_johnson.jpg,Gold Ticket - Annual Prize,Remote - California"""
+John Doe,https://example.com/john_doe.jpg,Level 1-(Red) Monthly Drawing,New York Office
+Jane Smith,https://example.com/jane_smith.jpg,Level 2-(Green) Quarterly Drawing,Chicago Branch
+Bob Johnson,https://example.com/bob_johnson.jpg,Level 3-(Gold) Annual Drawing Grand Prize,Remote - California"""
             
             st.download_button(
                 label="📥 Download Sample CSV Template",
@@ -517,25 +517,29 @@ Bob Johnson,https://example.com/bob_johnson.jpg,Gold Ticket - Annual Prize,Remot
                                 
                                 with col1:
                                     if winner_prize_level:
-                                        # Color code the prize levels
-                                        if "Red" in winner_prize_level:
+                                        # Color code the prize levels based on your exact format
+                                        if "Level 1-(Red)" in winner_prize_level or "Red" in winner_prize_level:
                                             prize_color = "#FF4444"
                                             prize_emoji = "🔴"
-                                        elif "Green" in winner_prize_level:
+                                            prize_type = "Monthly Drawing"
+                                        elif "Level 2-(Green)" in winner_prize_level or "Green" in winner_prize_level:
                                             prize_color = "#44FF44"
                                             prize_emoji = "🟢"
-                                        elif "Gold" in winner_prize_level:
+                                            prize_type = "Quarterly Drawing"
+                                        elif "Level 3-(Gold)" in winner_prize_level or "Gold" in winner_prize_level:
                                             prize_color = "#FFD700"
                                             prize_emoji = "🟡"
+                                            prize_type = "Annual Grand Prize"
                                         else:
                                             prize_color = "#888888"
                                             prize_emoji = "🎫"
+                                            prize_type = "Special Prize"
                                         
                                         st.markdown(
                                             f"""
-                                            <div style='text-align: center; padding: 20px; background: linear-gradient(45deg, {prize_color}22, {prize_color}44); border-radius: 15px; margin: 10px;'>
-                                                <h3 style='color: {prize_color}; margin: 0;'>{prize_emoji} Prize Level</h3>
-                                                <h2 style='color: {prize_color}; margin: 5px 0;'>{winner_prize_level}</h2>
+                                            <div style='text-align: center; padding: 20px; background: linear-gradient(45deg, {prize_color}22, {prize_color}44); border-radius: 15px; margin: 10px; border: 3px solid {prize_color};'>
+                                                <h3 style='color: {prize_color}; margin: 0;'>{prize_emoji} {prize_type}</h3>
+                                                <h2 style='color: {prize_color}; margin: 5px 0; font-size: 1.2em;'>{winner_prize_level}</h2>
                                             </div>
                                             """,
                                             unsafe_allow_html=True
