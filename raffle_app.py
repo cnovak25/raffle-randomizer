@@ -1,4 +1,4 @@
-mport pandas as pd
+import pandas as pd
 import random
 import base64
 import zipfile
@@ -8,19 +8,11 @@ import time
 from datetime import datetime
 import json
 import os
-<<<<<<< HEAD
 import streamlit as st
-from streamlit_extras.st_autorefresh import st_autorefresh
+from PIL import Image
+import plotly.graph_objects as go
 
 def run_app():
-=======
-
-def run_app():
-    import streamlit as st
-    from PIL import Image
-    import plotly.graph_objects as go
-    
->>>>>>> c6fab56fd4a93220ffbde98e024dd2c6ca72533b
     st.set_page_config(page_title="🎉 MEGA Raffle Celebration 🎉", page_icon="🎟️", layout="wide")
     
     # Initialize session state
@@ -538,12 +530,3 @@ def run_app():
                 st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("No winners yet! Start raffles to see the leaderboard.")
-<<<<<<< HEAD
-
-    # Auto-refresh every 5 seconds (5000 ms)
-    # st_autorefresh(interval=5000, key="raffle_autorefresh")
-=======
->>>>>>> c6fab56fd4a93220ffbde98e024dd2c6ca72533b
-
-if __name__ == "__main__":
-    run_app()
