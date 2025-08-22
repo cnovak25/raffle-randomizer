@@ -13,7 +13,7 @@ from PIL import Image
 import plotly.graph_objects as go
 
 def run_app():
-    st.set_page_config(page_title="🎉 MEGA Raffle Celebration 🎉", page_icon="🎟️", layout="wide")
+    st.set_page_config(page_title="🎉 The MVN Great Save Raffle 🎉", page_icon="🎟️", layout="wide")
     
     # Initialize session state
     if 'winner_history' not in st.session_state:
@@ -230,7 +230,7 @@ def run_app():
     # Load history on startup
     load_winner_history()
 
-    st.markdown("<h1 style='text-align: center; font-size: 4em; color: #FFD700;'>🎊 MEGA RAFFLE EXTRAVAGANZA 🎊</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; font-size: 4em; color: #FFD700;'>🎊 The MVN Great Save Raffle 🎊</h1>", unsafe_allow_html=True)
     
     # Create tabs
     tab1, tab2, tab3 = st.tabs(["🎰 Raffle Draw", "🏆 Hall of Fame", "📊 Leaderboard"])
@@ -246,7 +246,7 @@ def run_app():
             # Sample CSV download
             sample_csv = """Name,Photo
 John Doe,https://example.com/john_doe.jpg
-Jane Smith,jane_smith.jpg
+Jane Smith,https://example.com/jane_smith.jpg
 Bob Johnson,https://example.com/bob_johnson.jpg"""
             
             st.download_button(
@@ -258,10 +258,10 @@ Bob Johnson,https://example.com/bob_johnson.jpg"""
             )
             
         with col2:
-            uploaded_zip = st.file_uploader("🖼️ Upload ZIP with images", type=["zip"])
-            st.info("💡 **Two ways to add photos:**")
-            st.info("🌐 **URLs:** Put image URLs directly in your CSV Photo column")
-            st.info("📁 **Local files:** Upload a ZIP file + use filenames in CSV")
+            st.info("� **Photo Options:**")
+            st.success("🌐 **Recommended:** Use image URLs in your CSV (no ZIP needed)")
+            st.info("📁 **Alternative:** Upload ZIP with local images below")
+            uploaded_zip = st.file_uploader("🖼️ Optional: Upload ZIP with local images", type=["zip"])
 
         def play_celebration_sounds():
             sounds = [
@@ -328,13 +328,13 @@ Bob Johnson,https://example.com/bob_johnson.jpg"""
             """
             return certificate_html
 
-        # Process ZIP file
+        # Process ZIP file (optional)
         if uploaded_zip is not None:
             try:
                 st.session_state.images = extract_images_from_zip(uploaded_zip)
-                st.success(f"🎯 Loaded {len(st.session_state.images)} images!")
+                st.success(f"🎯 Loaded {len(st.session_state.images)} local images from ZIP!")
             except Exception as e:
-                st.error(f"Error: {e}")
+                st.error(f"Error loading ZIP: {e}")
 
         # Process Excel/CSV file
         if uploaded_excel is not None:
@@ -445,9 +445,8 @@ Bob Johnson,https://example.com/bob_johnson.jpg"""
                                 if pd.notna(winner_photo) and winner_photo != "":
                                     photo_value = str(winner_photo).strip()
                                     
-                                    # Check if it's a URL
+                                    # Check if it's a URL (recommended method)
                                     if photo_value.startswith(('http://', 'https://')):
-                                        st.info(f"🌐 Loading photo from URL: {photo_value[:50]}...")
                                         col1, col2, col3 = st.columns([1, 2, 1])
                                         with col2:
                                             try:
@@ -456,32 +455,26 @@ Bob Johnson,https://example.com/bob_johnson.jpg"""
                                                     use_column_width=True,
                                                     caption=f"🏆 {winner_name}"
                                                 )
+                                                st.success("📸 Photo loaded from URL")
                                             except Exception as e:
                                                 st.error(f"❌ Could not load image from URL: {e}")
                                                 st.info("🔗 Please check if the URL is accessible")
                                     else:
-                                        # Handle local file from ZIP
-                                        st.info(f"🔍 Looking for local photo: '{photo_value}'")
-                                        
-                                        if st.session_state.images:
-                                            st.info(f"📁 Available photos: {list(st.session_state.images.keys())}")
-                                            
-                                            if photo_value in st.session_state.images:
-                                                col1, col2, col3 = st.columns([1, 2, 1])
-                                                with col2:
-                                                    st.image(
-                                                        st.session_state.images[photo_value],
-                                                        use_column_width=True,
-                                                        caption=f"🏆 {winner_name}"
-                                                    )
-                                            else:
-                                                st.warning(f"📷 Photo file '{photo_value}' not found in uploaded images")
-                                                # Try to find similar filenames
-                                                similar_files = [f for f in st.session_state.images.keys() if photo_value.lower() in f.lower() or f.lower() in photo_value.lower()]
-                                                if similar_files:
-                                                    st.info(f"🔍 Did you mean one of these? {similar_files}")
+                                        # Handle local file from ZIP (if ZIP was uploaded)
+                                        if st.session_state.images and photo_value in st.session_state.images:
+                                            col1, col2, col3 = st.columns([1, 2, 1])
+                                            with col2:
+                                                st.image(
+                                                    st.session_state.images[photo_value],
+                                                    use_column_width=True,
+                                                    caption=f"🏆 {winner_name}"
+                                                )
+                                                st.success("� Photo loaded from ZIP file")
                                         else:
-                                            st.warning("📁 No images uploaded. For local files, upload a ZIP with photos.")
+                                            st.warning(f"📷 Could not find '{photo_value}'")
+                                            st.info("💡 **Tip:** Use image URLs in your CSV for easier photo management!")
+                                            if st.session_state.images:
+                                                st.info(f"📁 Available files in ZIP: {list(st.session_state.images.keys())}")
                                 else:
                                     st.info("📷 No photo specified for this winner")
                             
