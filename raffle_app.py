@@ -273,11 +273,14 @@ Bob Johnson,bob_johnson.jpg"""
         def extract_images_from_zip(zip_file):
             images = {}
             with zipfile.ZipFile(zip_file, 'r') as z:
+                st.info(f"📁 Found {len(z.namelist())} files in ZIP")
                 for filename in z.namelist():
                     if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp')):
                         clean_filename = Path(filename).name
                         if clean_filename:
                             images[clean_filename] = z.read(filename)
+                            st.success(f"✅ Loaded image: {clean_filename}")
+            st.info(f"📸 Total images loaded: {len(images)}")
             return images
 
         def create_confetti_rain():
@@ -434,16 +437,34 @@ Bob Johnson,bob_johnson.jpg"""
                                     unsafe_allow_html=True
                                 )
                                 
-                                # Display photo
-                                if pd.notna(winner_photo) and st.session_state.images:
+                                # Display photo with better debugging
+                                st.markdown("### 📸 Winner Photo")
+                                
+                                if pd.notna(winner_photo) and winner_photo != "":
                                     photo_filename = str(winner_photo).strip()
-                                    if photo_filename in st.session_state.images:
-                                        col1, col2, col3 = st.columns([1, 2, 1])
-                                        with col2:
-                                            st.image(
-                                                st.session_state.images[photo_filename],
-                                                use_column_width=True
-                                            )
+                                    st.info(f"🔍 Looking for photo: '{photo_filename}'")
+                                    
+                                    if st.session_state.images:
+                                        st.info(f"📁 Available photos: {list(st.session_state.images.keys())}")
+                                        
+                                        if photo_filename in st.session_state.images:
+                                            col1, col2, col3 = st.columns([1, 2, 1])
+                                            with col2:
+                                                st.image(
+                                                    st.session_state.images[photo_filename],
+                                                    use_column_width=True,
+                                                    caption=f"🏆 {winner_name}"
+                                                )
+                                        else:
+                                            st.warning(f"📷 Photo file '{photo_filename}' not found in uploaded images")
+                                            # Try to find similar filenames
+                                            similar_files = [f for f in st.session_state.images.keys() if photo_filename.lower() in f.lower() or f.lower() in photo_filename.lower()]
+                                            if similar_files:
+                                                st.info(f"🔍 Did you mean one of these? {similar_files}")
+                                    else:
+                                        st.warning("📁 No images uploaded yet. Upload a ZIP file with photos.")
+                                else:
+                                    st.info("📷 No photo specified for this winner")
                             
                             # Certificate section
                             st.markdown("---")
