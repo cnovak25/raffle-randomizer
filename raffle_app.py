@@ -26,6 +26,16 @@ def run_app():
     # Custom CSS for massive celebration
     st.markdown("""
     <style>
+    /* Hide any potential debug/code elements */
+    .stCode, pre, code {
+        display: none !important;
+    }
+    
+    /* Hide streamlit default elements that might show code */
+    .stException, .stAlert, .stError {
+        display: none !important;
+    }
+    
     .stApp {
         background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #f7b731, #5f27cd);
         background-size: 400% 400%;
@@ -271,24 +281,23 @@ Bob Johnson,bob_johnson.jpg"""
             return images
 
         def create_confetti_rain():
-            confetti_html = "<div class='fireworks' style='position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999;'>"
+            # Create confetti effect without showing HTML code
+            confetti_html = """
+            <div class='fireworks' style='position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999;'>
+            """
             colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#FFD700']
             for i in range(100):
                 left = random.randint(0, 100)
                 delay = random.random() * 3
                 color = random.choice(colors)
                 size = random.randint(5, 15)
-                confetti_html += f"""
-                <div class='confetti' style='
-                    left: {left}%;
-                    background-color: {color};
-                    width: {size}px;
-                    height: {size}px;
-                    animation-delay: {delay}s;
-                '></div>
-                """
+                confetti_html += f"""<div class='confetti' style='left: {left}%; background-color: {color}; width: {size}px; height: {size}px; animation-delay: {delay}s;'></div>"""
+            
             confetti_html += "</div>"
-            st.markdown(confetti_html, unsafe_allow_html=True)
+            
+            # Use a container to ensure clean rendering
+            confetti_container = st.empty()
+            confetti_container.markdown(confetti_html, unsafe_allow_html=True)
 
         def create_winner_certificate(winner_name, winner_photo=None):
             """Create a downloadable winner certificate"""
