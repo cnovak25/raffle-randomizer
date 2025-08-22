@@ -12,9 +12,9 @@ import streamlit as st
 from PIL import Image
 import plotly.graph_objects as go
 
+st.set_page_config(page_title="🎉 MEGA Raffle Celebration 🎉", page_icon="🎟️", layout="wide")
+
 def run_app():
-    st.set_page_config(page_title="🎉 MEGA Raffle Celebration 🎉", page_icon="🎟️", layout="wide")
-    
     # Initialize session state
     if 'winner_history' not in st.session_state:
         st.session_state.winner_history = []
