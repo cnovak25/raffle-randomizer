@@ -530,3 +530,6 @@ def run_app():
                 st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("No winners yet! Start raffles to see the leaderboard.")
+
+if __name__ == "__main__":
+    run_app()
