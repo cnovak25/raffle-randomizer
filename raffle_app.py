@@ -232,8 +232,24 @@ def run_app():
         col1, col2 = st.columns(2)
         with col1:
             uploaded_excel = st.file_uploader("📊 Upload Excel/CSV file", type=["xlsx", "csv"])
+            
+            # Sample CSV download
+            sample_csv = """Name,Photo
+John Doe,john_doe.jpg
+Jane Smith,jane_smith.jpg
+Bob Johnson,bob_johnson.jpg"""
+            
+            st.download_button(
+                label="📥 Download Sample CSV Template",
+                data=sample_csv,
+                file_name="sample_participants.csv",
+                mime="text/csv",
+                help="Download this template and fill it with your participant data"
+            )
+            
         with col2:
             uploaded_zip = st.file_uploader("🖼️ Upload ZIP with images", type=["zip"])
+            st.info("💡 **Optional:** Upload a ZIP file containing participant photos. Photo filenames should match the 'Photo' column in your CSV.")
 
         def play_celebration_sounds():
             sounds = [
@@ -316,9 +332,20 @@ def run_app():
                 
                 df.columns = df.columns.str.strip()
                 
-                if not {"Name", "Photo"}.issubset(df.columns):
-                    st.error("Need 'Name' and 'Photo' columns!")
+                # Check for required columns
+                required_cols = ["Name"]
+                optional_cols = ["Photo"]
+                missing_required = [col for col in required_cols if col not in df.columns]
+                
+                if missing_required:
+                    st.error(f"❌ Missing required column(s): {', '.join(missing_required)}")
+                    st.info(f"📋 Found columns: {', '.join(df.columns.tolist())}")
+                    st.info("💡 Make sure your file has at least a 'Name' column. 'Photo' column is optional.")
                 else:
+                    # Add Photo column if missing (optional)
+                    if "Photo" not in df.columns:
+                        df["Photo"] = ""  # Empty photo column
+                        st.warning("📸 No 'Photo' column found - participants will appear without photos")
                     st.success(f"🎪 Loaded {len(df)} participants!")
                     
                     # Countdown settings
