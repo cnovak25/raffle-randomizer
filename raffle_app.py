@@ -245,21 +245,23 @@ def run_app():
             
             # Sample CSV download
             sample_csv = """Name,Photo
-John Doe,john_doe.jpg
+John Doe,https://example.com/john_doe.jpg
 Jane Smith,jane_smith.jpg
-Bob Johnson,bob_johnson.jpg"""
+Bob Johnson,https://example.com/bob_johnson.jpg"""
             
             st.download_button(
                 label="📥 Download Sample CSV Template",
                 data=sample_csv,
                 file_name="sample_participants.csv",
                 mime="text/csv",
-                help="Download this template and fill it with your participant data"
+                help="Download this template. Photo column can contain URLs or local filenames."
             )
             
         with col2:
             uploaded_zip = st.file_uploader("🖼️ Upload ZIP with images", type=["zip"])
-            st.info("💡 **Optional:** Upload a ZIP file containing participant photos. Photo filenames should match the 'Photo' column in your CSV.")
+            st.info("💡 **Two ways to add photos:**")
+            st.info("🌐 **URLs:** Put image URLs directly in your CSV Photo column")
+            st.info("📁 **Local files:** Upload a ZIP file + use filenames in CSV")
 
         def play_celebration_sounds():
             sounds = [
@@ -437,32 +439,49 @@ Bob Johnson,bob_johnson.jpg"""
                                     unsafe_allow_html=True
                                 )
                                 
-                                # Display photo with better debugging
+                                # Display photo with URL support
                                 st.markdown("### 📸 Winner Photo")
                                 
                                 if pd.notna(winner_photo) and winner_photo != "":
-                                    photo_filename = str(winner_photo).strip()
-                                    st.info(f"🔍 Looking for photo: '{photo_filename}'")
+                                    photo_value = str(winner_photo).strip()
                                     
-                                    if st.session_state.images:
-                                        st.info(f"📁 Available photos: {list(st.session_state.images.keys())}")
-                                        
-                                        if photo_filename in st.session_state.images:
-                                            col1, col2, col3 = st.columns([1, 2, 1])
-                                            with col2:
+                                    # Check if it's a URL
+                                    if photo_value.startswith(('http://', 'https://')):
+                                        st.info(f"🌐 Loading photo from URL: {photo_value[:50]}...")
+                                        col1, col2, col3 = st.columns([1, 2, 1])
+                                        with col2:
+                                            try:
                                                 st.image(
-                                                    st.session_state.images[photo_filename],
+                                                    photo_value,
                                                     use_column_width=True,
                                                     caption=f"🏆 {winner_name}"
                                                 )
-                                        else:
-                                            st.warning(f"📷 Photo file '{photo_filename}' not found in uploaded images")
-                                            # Try to find similar filenames
-                                            similar_files = [f for f in st.session_state.images.keys() if photo_filename.lower() in f.lower() or f.lower() in photo_filename.lower()]
-                                            if similar_files:
-                                                st.info(f"🔍 Did you mean one of these? {similar_files}")
+                                            except Exception as e:
+                                                st.error(f"❌ Could not load image from URL: {e}")
+                                                st.info("🔗 Please check if the URL is accessible")
                                     else:
-                                        st.warning("📁 No images uploaded yet. Upload a ZIP file with photos.")
+                                        # Handle local file from ZIP
+                                        st.info(f"🔍 Looking for local photo: '{photo_value}'")
+                                        
+                                        if st.session_state.images:
+                                            st.info(f"📁 Available photos: {list(st.session_state.images.keys())}")
+                                            
+                                            if photo_value in st.session_state.images:
+                                                col1, col2, col3 = st.columns([1, 2, 1])
+                                                with col2:
+                                                    st.image(
+                                                        st.session_state.images[photo_value],
+                                                        use_column_width=True,
+                                                        caption=f"🏆 {winner_name}"
+                                                    )
+                                            else:
+                                                st.warning(f"📷 Photo file '{photo_value}' not found in uploaded images")
+                                                # Try to find similar filenames
+                                                similar_files = [f for f in st.session_state.images.keys() if photo_value.lower() in f.lower() or f.lower() in photo_value.lower()]
+                                                if similar_files:
+                                                    st.info(f"🔍 Did you mean one of these? {similar_files}")
+                                        else:
+                                            st.warning("📁 No images uploaded. For local files, upload a ZIP with photos.")
                                 else:
                                     st.info("📷 No photo specified for this winner")
                             
