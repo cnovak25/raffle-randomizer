@@ -147,7 +147,7 @@ def test_kpa_integration() -> dict:
     
     # Test users.info endpoint
     try:
-        test_data = {"token": KPA_TOKEN, "user_id": "test_user"}
+        test_data = {"token": KPA_TOKEN, "id": "test_user"}
         resp = requests.post(f"{API_BASE}/users.info", json=test_data, timeout=5)
         if resp.status_code == 200:
             result = resp.json()
@@ -160,9 +160,9 @@ def test_kpa_integration() -> dict:
     except Exception as e:
         status["error_messages"].append(f"users.info: {str(e)}")
     
-    # Test users.list endpoint  
+    # Test users.list endpoint (only token parameter supported)
     try:
-        test_data = {"token": KPA_TOKEN, "query": "test", "limit": 1}
+        test_data = {"token": KPA_TOKEN}
         resp = requests.post(f"{API_BASE}/users.list", json=test_data, timeout=5)
         if resp.status_code == 200:
             result = resp.json()
@@ -221,7 +221,7 @@ def fetch_photo_by_user_id(user_id: str) -> Optional[bytes]:
     
     try:
         # Try the users.info endpoint to get user details including photo
-        data = {"token": KPA_TOKEN, "user_id": user_id}
+        data = {"token": KPA_TOKEN, "id": user_id}
         resp = requests.post(f"{API_BASE}/users.info", json=data, timeout=10)
         
         if resp.status_code == 200:
@@ -258,10 +258,10 @@ def fetch_photo_by_user_id(user_id: str) -> Optional[bytes]:
     except Exception as e:
         st.warning(f"⚠️ Users.info API error: {str(e)}")
     
-    # Try alternative: users.list to search for the user
+    # Try alternative: users.list to get all users (no query/limit supported)
     try:
         st.info(f"🔍 Trying users.list to find user: {user_id}")
-        search_data = {"token": KPA_TOKEN, "query": user_id, "limit": 5}
+        search_data = {"token": KPA_TOKEN}
         resp = requests.post(f"{API_BASE}/users.list", json=search_data, timeout=10)
         
         if resp.status_code == 200:
