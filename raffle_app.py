@@ -297,23 +297,117 @@ def run_app():
     with tab1:
         st.markdown("<p style='text-align: center; font-size: 1.5em;'>Get ready for the most EPIC winner announcement!</p>", unsafe_allow_html=True)
 
+        # Auto-load from your Google Sheets (streamlined)
+        st.markdown("### 🚀 Quick Load Your Data")
+        if st.button("📊 Load MVN Raffle Data", type="primary"):
+            try:
+                import requests
+                from io import StringIO
+                
+                # Your Google Sheets URL - automatically converted
+                google_sheets_url = "https://docs.google.com/spreadsheets/d/1x_L53CCwC6gNI5iL4iAMZPV7x4o8nRlOtcOfMWR2Ie8/export?format=csv"
+                
+                with st.spinner("Loading your raffle data..."):
+                    response = requests.get(google_sheets_url)
+                    if response.status_code == 200:
+                        csv_data = StringIO(response.text)
+                        df = pd.read_csv(csv_data)
+                        st.session_state.df = df
+                        st.success(f"✅ Loaded {len(df)} participants from Google Sheets!")
+                        st.balloons()
+                        st.rerun()
+                    else:
+                        st.error(f"❌ Failed to load data. Status: {response.status_code}")
+            except Exception as e:
+                st.error(f"❌ Error loading data: {e}")
+
+        st.markdown("---")
+        
         # File uploaders
         col1, col2 = st.columns(2)
         with col1:
+            # Option 1: Upload local file
             uploaded_excel = st.file_uploader("📊 Upload Excel/CSV file", type=["xlsx", "csv"])
+            
+            # Option 2: Load from Cloud URL (Dropbox/Google Sheets)
+            st.markdown("**OR**")
+            cloud_csv_url = st.text_input(
+                "☁️ Load CSV from Cloud URL:",
+                placeholder="Dropbox or Google Sheets sharing link",
+                help="Supports Dropbox sharing links and Google Sheets sharing links"
+            )
+            
+            if cloud_csv_url:
+                if st.button("📥 Load CSV from Cloud"):
+                    try:
+                        direct_url = None
+                        
+                        # Handle Google Sheets URLs
+                        if "docs.google.com/spreadsheets" in cloud_csv_url:
+                            # Extract the spreadsheet ID from Google Sheets URL
+                            if "/d/" in cloud_csv_url:
+                                sheet_id = cloud_csv_url.split("/d/")[1].split("/")[0]
+                                direct_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+                                st.info("🔄 Converting Google Sheets URL to CSV download format...")
+                            else:
+                                st.error("Invalid Google Sheets URL format")
+                                
+                        # Handle Dropbox URLs
+                        elif "dropbox.com" in cloud_csv_url:
+                            st.info("🔄 Converting Dropbox URL to direct download format...")
+                            # Handle new Dropbox format (scl/fi) and old format
+                            if "scl/fi" in cloud_csv_url:
+                                # New Dropbox sharing format
+                                direct_url = cloud_csv_url.replace("?dl=0", "?dl=1").replace("&dl=0", "&dl=1")
+                                if "dl=1" not in direct_url:
+                                    if "?" in direct_url:
+                                        direct_url = direct_url + "&dl=1"
+                                    else:
+                                        direct_url = direct_url + "?dl=1"
+                            else:
+                                # Old Dropbox format
+                                if "?dl=0" in cloud_csv_url:
+                                    direct_url = cloud_csv_url.replace("?dl=0", "?dl=1")
+                                elif "?dl=1" not in cloud_csv_url:
+                                    direct_url = cloud_csv_url + ("&dl=1" if "?" in cloud_csv_url else "?dl=1")
+                                else:
+                                    direct_url = cloud_csv_url
+                        else:
+                            st.error("Please enter a valid Dropbox or Google Sheets URL")
+                            
+                        # Load CSV from URL
+                        if direct_url:
+                            import requests
+                            st.info(f"📡 Downloading from: {direct_url[:100]}...")
+                            response = requests.get(direct_url)
+                            if response.status_code == 200:
+                                from io import StringIO
+                                csv_data = StringIO(response.text)
+                                df = pd.read_csv(csv_data)
+                                st.session_state.df = df
+                                st.success(f"✅ Successfully loaded CSV! Found {len(df)} participants.")
+                                st.info(f"📊 Columns found: {', '.join(df.columns)}")
+                                st.rerun()
+                            else:
+                                st.error(f"❌ Failed to download CSV. Status code: {response.status_code}")
+                                st.info("Make sure the link is publicly accessible")
+                                
+                    except Exception as e:
+                        st.error(f"❌ Error loading CSV: {e}")
+                        st.info("Make sure the file is a valid CSV and publicly accessible")
             
             # Sample CSV download
             sample_csv = """Name,Photo,Prize_Level,Location
-John Doe,https://example.com/john_doe.jpg,Level 1-(Red) Monthly Drawing,New York Office
-Jane Smith,https://example.com/jane_smith.jpg,Level 2-(Green) Quarterly Drawing,Chicago Branch
-Bob Johnson,https://example.com/bob_johnson.jpg,Level 3-(Gold) Annual Drawing Grand Prize,Remote - California"""
+John Doe,https://dl.dropboxusercontent.com/s/abc123/john.jpg,Level 1-(Red) Monthly Drawing,New York Office
+Jane Smith,https://dl.dropboxusercontent.com/s/def456/jane.jpg,Level 2-(Green) Quarterly Drawing,Chicago Branch
+Bob Johnson,https://dl.dropboxusercontent.com/s/ghi789/bob.jpg,Level 3-(Gold) Annual Drawing Grand Prize,Remote - California"""
             
             st.download_button(
                 label="📥 Download Sample CSV Template",
                 data=sample_csv,
                 file_name="sample_participants.csv",
                 mime="text/csv",
-                help="Download this template. Add Prize_Level column to specify ticket color and prize type."
+                help="Download this template with Dropbox image URL examples"
             )
             
         with col2:
@@ -571,16 +665,40 @@ Bob Johnson,https://example.com/bob_johnson.jpg,Level 3-(Gold) Annual Drawing Gr
                                     if photo_value.startswith(('http://', 'https://')):
                                         col1, col2, col3 = st.columns([1, 2, 1])
                                         with col2:
-                                            try:
-                                                st.image(
-                                                    photo_value,
-                                                    use_column_width=True,
-                                                    caption=f"🏆 {winner_name}"
-                                                )
-                                                st.success("📸 Photo loaded from URL")
-                                            except Exception as e:
-                                                st.error(f"❌ Could not load image from URL: {e}")
-                                                st.info("🔗 Please check if the URL is accessible")
+                                            # Check if it's an mvncorp URL that requires authentication
+                                            if "mvncorp.kpaehs.com" in photo_value:
+                                                # mvncorp URLs require authentication - show winner card instead
+                                                winner_card_html = f"""
+                                                <div style='text-align: center; margin: 20px 0;'>
+                                                    <div style='padding: 30px; border: 3px solid #FFD700; border-radius: 15px; background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: white; text-align: center; box-shadow: 0 8px 16px rgba(0,0,0,0.2);'>
+                                                        <h3 style='margin: 0; font-size: 3em;'>🏆</h3>
+                                                        <h2 style='margin: 15px 0; color: white; font-size: 1.8em;'>{winner_name}</h2>
+                                                        <p style='margin: 10px 0; opacity: 0.9; font-size: 1.1em;'>🎉 WINNER! 🎉</p>
+                                                        <p style='margin: 10px 0; font-size: 0.9em;'><a href='{photo_value}' target='_blank' style='color: white; text-decoration: underline; font-weight: bold;'>📷 View Photo</a></p>
+                                                    </div>
+                                                </div>
+                                                """
+                                                st.markdown(winner_card_html, unsafe_allow_html=True)
+                                                st.info("📷 Click 'View Photo' above to see the winner's photo (opens in new tab)")
+                                            else:
+                                                # For non-mvncorp URLs, try normal image display
+                                                try:
+                                                    st.image(photo_value, width=300, caption=f"🏆 {winner_name}")
+                                                    st.success("📸 Winner Photo")
+                                                except Exception as e:
+                                                    # Fallback winner card for other failed URLs
+                                                    winner_card_html = f"""
+                                                    <div style='text-align: center; margin: 20px 0;'>
+                                                        <div style='padding: 30px; border: 3px solid #FFD700; border-radius: 15px; background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: white; text-align: center; box-shadow: 0 8px 16px rgba(0,0,0,0.2);'>
+                                                            <h3 style='margin: 0; font-size: 3em;'>🏆</h3>
+                                                            <h2 style='margin: 15px 0; color: white; font-size: 1.8em;'>{winner_name}</h2>
+                                                            <p style='margin: 10px 0; opacity: 0.9; font-size: 1.1em;'>🎉 WINNER! 🎉</p>
+                                                            <p style='margin: 10px 0; font-size: 0.9em;'><a href='{photo_value}' target='_blank' style='color: white; text-decoration: underline; font-weight: bold;'>📷 View Photo</a></p>
+                                                        </div>
+                                                    </div>
+                                                    """
+                                                    st.markdown(winner_card_html, unsafe_allow_html=True)
+                                                    st.info("📷 Click 'View Photo' above to see the winner's photo (opens in new tab)")
                                     else:
                                         # Handle local file from ZIP (if ZIP was uploaded)
                                         if st.session_state.images and photo_value in st.session_state.images:
@@ -588,13 +706,13 @@ Bob Johnson,https://example.com/bob_johnson.jpg,Level 3-(Gold) Annual Drawing Gr
                                             with col2:
                                                 st.image(
                                                     st.session_state.images[photo_value],
-                                                    use_column_width=True,
+                                                    width=300,
                                                     caption=f"🏆 {winner_name}"
                                                 )
-                                                st.success("� Photo loaded from ZIP file")
+                                                st.success("📸 Photo loaded from ZIP file")
                                         else:
                                             st.warning(f"📷 Could not find '{photo_value}'")
-                                            st.info("💡 **Tip:** Use image URLs in your CSV for easier photo management!")
+                                            st.info("💡 **Tip:** Use publicly accessible image URLs in your CSV!")
                                             if st.session_state.images:
                                                 st.info(f"📁 Available files in ZIP: {list(st.session_state.images.keys())}")
                                 else:
@@ -726,6 +844,114 @@ Bob Johnson,https://example.com/bob_johnson.jpg,Level 3-(Gold) Annual Drawing Gr
                 st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("No winners yet! Start raffles to see the leaderboard.")
+
+    # Quick test section for debugging photo URLs
+    with st.expander("🔧 Debug Photo URL Test"):
+        st.markdown("### Test Specific Photo URL")
+        test_url = st.text_input("Enter photo URL to test:", 
+                                 value="https://example.com/sample-image.jpg")
+        
+        if st.button("🧪 Test Photo URL"):
+            if test_url:
+                st.info(f"Testing URL: {test_url[:100]}...")
+                
+                # Check if it's an mvncorp URL
+                if "mvncorp.kpaehs.com" in test_url:
+                    st.warning("⚠️ MVN Corp URLs require authentication and cannot be displayed directly in the app.")
+                    st.info("💡 These URLs will show winner cards with clickable links instead.")
+                    
+                    # Show how mvncorp URLs will be handled
+                    winner_card_html = f"""
+                    <div style='text-align: center; margin: 20px 0;'>
+                        <div style='padding: 30px; border: 3px solid #FFD700; border-radius: 15px; background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: white; text-align: center; box-shadow: 0 8px 16px rgba(0,0,0,0.2);'>
+                            <h3 style='margin: 0; font-size: 3em;'>🏆</h3>
+                            <h2 style='margin: 15px 0; color: white; font-size: 1.8em;'>Test Winner</h2>
+                            <p style='margin: 10px 0; opacity: 0.9; font-size: 1.1em;'>🎉 WINNER! 🎉</p>
+                            <p style='margin: 10px 0; font-size: 0.9em;'><a href='{test_url}' target='_blank' style='color: white; text-decoration: underline; font-weight: bold;'>📷 View Photo</a></p>
+                        </div>
+                    </div>
+                    """
+                    st.markdown(winner_card_html, unsafe_allow_html=True)
+                    st.success("✅ MVN Corp URLs are handled with elegant winner cards!")
+                else:
+                    # Test with Streamlit's st.image for non-mvncorp URLs
+                    st.markdown("#### Method 1: Streamlit st.image()")
+                    try:
+                        st.image(test_url, width=300, caption="Test with st.image()")
+                        st.success("✅ st.image() worked!")
+                    except Exception as e:
+                        st.error(f"❌ st.image() failed: {e}")
+                        
+                        # Show fallback winner card for failed URLs
+                        st.markdown("#### Fallback: Winner Card")
+                        winner_card_html = f"""
+                        <div style='text-align: center; margin: 20px 0;'>
+                            <div style='padding: 30px; border: 3px solid #FFD700; border-radius: 15px; background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: white; text-align: center; box-shadow: 0 8px 16px rgba(0,0,0,0.2);'>
+                                <h3 style='margin: 0; font-size: 3em;'>🏆</h3>
+                                <h2 style='margin: 15px 0; color: white; font-size: 1.8em;'>Test Winner</h2>
+                                <p style='margin: 10px 0; opacity: 0.9; font-size: 1.1em;'>🎉 WINNER! 🎉</p>
+                                <p style='margin: 10px 0; font-size: 0.9em;'><a href='{test_url}' target='_blank' style='color: white; text-decoration: underline; font-weight: bold;'>📷 View Photo</a></p>
+                            </div>
+                        </div>
+                        """
+                        st.markdown(winner_card_html, unsafe_allow_html=True)
+                        st.success("✅ Fallback winner card displayed!")
+                
+                # Provide workaround suggestions for any failed URLs
+                st.markdown("#### 💡 Alternative Solutions for Photo URLs")
+                st.markdown("""
+                **Since neither method worked, here are your options:**
+                
+                1. **� Dropbox Public URLs (Recommended):**
+                   - Upload images to Dropbox
+                   - Share the file and copy the link
+                   - **Important:** Change `dropbox.com` to `dl.dropboxusercontent.com` in the URL
+                   - Example: `https://dl.dropboxusercontent.com/s/abc123/photo.jpg`
+                
+                2. **📁 Use ZIP file upload:**
+                   - Download images from the URLs (right-click → Save As)
+                   - Put all images in a ZIP file
+                   - Upload the ZIP using the app's ZIP uploader
+                
+                3. **🌐 Other public image services:**
+                   - **Google Drive:** Share publicly and use direct link format
+                   - **Imgur:** Upload and use direct image URL
+                   - **GitHub:** Upload to repository and use raw URL
+                   
+                4. **📋 Use image names only:**
+                   - Put just the person's name in the Photo column
+                   - The app will show the name instead of trying to load an image
+                """)
+                
+                # Add Dropbox URL converter
+                st.markdown("#### 🔧 Dropbox URL Converter")
+                dropbox_url = st.text_input("Paste Dropbox sharing URL here:", 
+                                           placeholder="https://www.dropbox.com/s/abc123/photo.jpg?dl=0")
+                
+                if dropbox_url and "dropbox.com" in dropbox_url:
+                    # Convert Dropbox sharing URL to direct URL
+                    if "?dl=0" in dropbox_url:
+                        direct_url = dropbox_url.replace("www.dropbox.com", "dl.dropboxusercontent.com").replace("?dl=0", "")
+                    elif "?dl=1" in dropbox_url:
+                        direct_url = dropbox_url.replace("www.dropbox.com", "dl.dropboxusercontent.com").replace("?dl=1", "")
+                    else:
+                        direct_url = dropbox_url.replace("www.dropbox.com", "dl.dropboxusercontent.com")
+                    
+                    st.success(f"✅ **Converted URL (copy this for your CSV):**")
+                    st.code(direct_url, language="text")
+                    
+                    # Test the converted URL
+                    if st.button("🧪 Test Converted Dropbox URL"):
+                        try:
+                            st.image(direct_url, width=300, caption="Dropbox Image Test")
+                            st.success("🎉 Dropbox image works! Use this URL format in your CSV.")
+                        except Exception as e:
+                            st.error(f"❌ Converted URL failed: {e}")
+                            st.info("Make sure the Dropbox file is publicly shared")
+                
+                # Show clickable link
+                st.markdown(f"**🔗 [Click here to open the original image URL directly]({test_url})**")
+                st.info("↑ This link should work in your browser since you're authenticated")
 
 if __name__ == "__main__":
     run_app()
