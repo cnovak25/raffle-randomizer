@@ -1,8 +1,6 @@
 [server]
-# Enable external access
+# Streamlit Cloud configuration
 headless = true
-port = 8502
-address = "0.0.0.0"
 enableCORS = false
 enableXsrfProtection = false
 
