@@ -4,6 +4,7 @@ from PIL import Image, ImageDraw, ImageFont
 import plotly.graph_objects as go
 from datetime import datetime
 import base64
+from typing import Optional
 
 # Configure page for mobile-first responsive design
 st.set_page_config(
@@ -72,28 +73,64 @@ API_BASE = "https://api.kpaehs.com/v1"
 # Try to use local proxy first, fallback to direct API for cloud deployment
 PHOTO_PROXY_URL = os.getenv("PHOTO_PROXY_URL", "http://localhost:5001/api/v1/photos/proxy")
 
-# Enhanced token access with better debugging
+# Enhanced token access with detailed debugging
 KPA_TOKEN = None
 try:
-    # Try Streamlit secrets first (cloud deployment)
-    if hasattr(st, 'secrets') and st.secrets:
-        KPA_TOKEN = st.secrets.get("KPA_TOKEN", None)
-        if KPA_TOKEN:
-            st.success(f"✅ KPA_TOKEN loaded from Streamlit secrets (length: {len(KPA_TOKEN)})")
-        else:
-            st.warning("⚠️ KPA_TOKEN not found in Streamlit secrets")
-    # Fallback to environment variable (local development)
+    # Debug: Check Streamlit secrets availability
+    st.write("🔍 **Secrets Debug:**")
+    
+    # Check if secrets are available
+    has_secrets_attr = hasattr(st, 'secrets')
+    st.write(f"- Secrets attribute available: {has_secrets_attr}")
+    
+    if has_secrets_attr:
+        try:
+            # Try to access secrets safely
+            secrets_obj = getattr(st, 'secrets', None)
+            if secrets_obj is not None:
+                st.write("- Secrets object exists")
+                
+                # Try to get the token
+                token_value = None
+                if hasattr(secrets_obj, 'get'):
+                    token_value = secrets_obj.get("KPA_TOKEN")
+                elif hasattr(secrets_obj, '__getitem__'):
+                    try:
+                        token_value = secrets_obj["KPA_TOKEN"]
+                    except (KeyError, TypeError):
+                        pass
+                
+                if token_value:
+                    KPA_TOKEN = token_value
+                    st.success(f"✅ KPA_TOKEN found (length: {len(KPA_TOKEN)})")
+                else:
+                    st.warning("⚠️ KPA_TOKEN not found in secrets")
+                    # Show available keys for debugging
+                    try:
+                        if hasattr(secrets_obj, 'keys'):
+                            available_keys = list(secrets_obj.keys())
+                            st.write(f"- Available keys: {available_keys}")
+                    except Exception:
+                        pass
+            else:
+                st.warning("⚠️ Secrets object is None")
+        except Exception as e:
+            st.error(f"❌ Error accessing secrets: {str(e)}")
+    
+    # Fallback to environment variable
     if not KPA_TOKEN:
-        KPA_TOKEN = os.getenv("KPA_TOKEN")
-        if KPA_TOKEN:
-            st.info(f"ℹ️ KPA_TOKEN loaded from environment (length: {len(KPA_TOKEN)})")
+        env_token = os.getenv("KPA_TOKEN")
+        if env_token:
+            KPA_TOKEN = env_token
+            st.info(f"ℹ️ Using environment variable (length: {len(KPA_TOKEN)})")
         else:
-            st.error("❌ KPA_TOKEN not found in secrets or environment variables")
+            st.error("❌ KPA_TOKEN not found in secrets or environment")
+            
 except Exception as e:
-    st.error(f"❌ Error accessing KPA_TOKEN: {str(e)}")
+    st.error(f"❌ Token access error: {str(e)}")
     KPA_TOKEN = None
 
-def extract_key_from_tenant_url(url: str) -> str | None:
+def extract_key_from_tenant_url(url: str) -> Optional[str]:
     """From https://<tenant>.kpaehs.com/get-upload?key=ENCODED → 'private/.../image.jpg'"""
     if not isinstance(url, str) or "get-upload" not in url:
         return None
@@ -105,7 +142,7 @@ def extract_key_from_tenant_url(url: str) -> str | None:
     except Exception:
         return None
 
-def fetch_photo_bytes(photo_field: str) -> bytes | None:
+def fetch_photo_bytes(photo_field: str) -> Optional[bytes]:
     """Accepts either a tenant URL or a raw storage key; returns image bytes via proxy or direct API."""
     key = extract_key_from_tenant_url(photo_field) if "get-upload" in (photo_field or "") else photo_field
     if not key:
@@ -164,7 +201,7 @@ def fetch_photo_bytes(photo_field: str) -> bytes | None:
     
     return None
 
-def draw_winner_card(name: str, location: str, level: str, photo_bytes: bytes | None) -> Image.Image:
+def draw_winner_card(name: str, location: str, level: str, photo_bytes: Optional[bytes]) -> Image.Image:
     W, H = 1200, 675
     img = Image.new("RGB", (W, H), (20, 24, 28))
     d = ImageDraw.Draw(img)
