@@ -158,15 +158,16 @@ def fetch_photo_bytes(photo_field: str) -> Optional[bytes]:
     if is_cloud:
         # Cloud deployment - use direct KPA API (skip proxy)
         try:
+            # Try 1: Use attachments.download endpoint
             data = {"token": KPA_TOKEN, "key": key}
-            resp = requests.post(f"{API_BASE}/files.get_url", json=data, timeout=10)
+            resp = requests.post(f"{API_BASE}/attachments.download", json=data, timeout=10)
             if resp.status_code == 200:
                 url_data = resp.json()
-                st.write(f"🔍 KPA API Response: {url_data}")  # Debug the actual response
+                st.write(f"🔍 Attachments Download Response: {url_data}")
                 
                 # Try different possible field names for the download URL
                 download_url = None
-                for url_field in ["url", "download_url", "file_url", "link", "downloadUrl", "fileUrl"]:
+                for url_field in ["url", "download_url", "file_url", "link", "downloadUrl", "fileUrl", "photo_url"]:
                     if url_field in url_data:
                         download_url = url_data[url_field]
                         st.info(f"✅ Found download URL in field: {url_field}")
@@ -175,17 +176,51 @@ def fetch_photo_bytes(photo_field: str) -> Optional[bytes]:
                 if download_url:
                     img_resp = requests.get(download_url, timeout=10)
                     if img_resp.status_code == 200:
-                        st.success("📸 Photo loaded successfully!")
+                        st.success("📸 Photo loaded successfully via attachments.download!")
                         return img_resp.content
-                    else:
-                        st.warning(f"⚠️ Photo download failed: HTTP {img_resp.status_code}")
-                else:
-                    st.warning("⚠️ KPA API response missing download URL")
-                    st.write(f"Available fields: {list(url_data.keys())}")
             else:
-                st.warning(f"⚠️ KPA API error: HTTP {resp.status_code}")
+                st.write(f"🔍 Attachments Download Response: {resp.json()}")
         except Exception as e:
-            st.error(f"❌ Photo fetch error: {str(e)}")
+            st.warning(f"⚠️ Attachments download failed: {str(e)}")
+        
+        try:
+            # Try 2: Use photos.get endpoint
+            data = {"token": KPA_TOKEN, "key": key}
+            resp = requests.post(f"{API_BASE}/photos.get", json=data, timeout=10)
+            if resp.status_code == 200:
+                url_data = resp.json()
+                st.write(f"🔍 Photos Get Response: {url_data}")
+                
+                # Try different possible field names for the download URL
+                download_url = None
+                for url_field in ["url", "download_url", "file_url", "link", "downloadUrl", "fileUrl", "photo_url"]:
+                    if url_field in url_data:
+                        download_url = url_data[url_field]
+                        st.info(f"✅ Found download URL in field: {url_field}")
+                        break
+                
+                if download_url:
+                    img_resp = requests.get(download_url, timeout=10)
+                    if img_resp.status_code == 200:
+                        st.success("📸 Photo loaded successfully via photos.get!")
+                        return img_resp.content
+            else:
+                st.write(f"🔍 Photos Get Response: {resp.json()}")
+        except Exception as e:
+            st.warning(f"⚠️ Photos.get failed: {str(e)}")
+            
+        try:
+            # Try 3: Direct photo URL approach (if it's already a full URL)
+            if photo_field.startswith("http"):
+                st.info(f"🔗 Trying direct photo URL: {photo_field}")
+                img_resp = requests.get(photo_field, timeout=10)
+                if img_resp.status_code == 200:
+                    st.success("📸 Photo loaded directly from URL!")
+                    return img_resp.content
+                else:
+                    st.warning(f"⚠️ Direct URL failed: HTTP {img_resp.status_code}")
+        except Exception as e:
+            st.warning(f"⚠️ Direct URL fetch failed: {str(e)}")
     else:
         # Local development - try proxy first, then direct API
         try:
@@ -198,15 +233,16 @@ def fetch_photo_bytes(photo_field: str) -> Optional[bytes]:
         
         # Fallback to direct KPA API for local too
         try:
+            # Try the attachments.download endpoint first
             data = {"token": KPA_TOKEN, "key": key}
-            resp = requests.post(f"{API_BASE}/files.get_url", json=data, timeout=10)
+            resp = requests.post(f"{API_BASE}/attachments.download", json=data, timeout=10)
             if resp.status_code == 200:
                 url_data = resp.json()
-                st.write(f"🔍 KPA API Response (local fallback): {url_data}")  # Debug the actual response
+                st.write(f"🔍 KPA API Response (local fallback): {url_data}")
                 
                 # Try different possible field names for the download URL
                 download_url = None
-                for url_field in ["url", "download_url", "file_url", "link", "downloadUrl", "fileUrl"]:
+                for url_field in ["url", "download_url", "file_url", "link", "downloadUrl", "fileUrl", "photo_url"]:
                     if url_field in url_data:
                         download_url = url_data[url_field]
                         st.info(f"✅ Found download URL in field: {url_field}")

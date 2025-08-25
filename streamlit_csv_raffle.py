@@ -130,6 +130,135 @@ except Exception as e:
     st.error(f"❌ Token access error: {str(e)}")
     KPA_TOKEN = None
 
+def extract_user_id(employee_name: str, photo_field: str) -> Optional[str]:
+    """Extract user ID from name or photo field for KPA API lookup"""
+    if not employee_name and not photo_field:
+        return None
+    
+    # Method 1: Try to extract from KPA user ID patterns in photo URL
+    if photo_field and "kpaehs.com" in photo_field:
+        # Look for user ID patterns in the URL or key
+        key = extract_key_from_tenant_url(photo_field)
+        if key and "/" in key:
+            # Extract potential user ID from private path like: private/ytbg74inq29x9bop/image.jpg
+            parts = key.split("/")
+            if len(parts) >= 2:
+                potential_id = parts[1]  # ytbg74inq29x9bop
+                if len(potential_id) > 10:  # Reasonable user ID length
+                    st.info(f"🔍 Extracted potential user ID from photo: {potential_id}")
+                    return potential_id
+    
+    # Method 2: Try to extract user code from name (like "John Doe (USR001)")
+    if employee_name:
+        import re
+        # Look for patterns like (USR001), (MVN123), etc.
+        user_pattern = r'\(([A-Z]+\d+)\)'
+        match = re.search(user_pattern, employee_name)
+        if match:
+            user_id = match.group(1)
+            st.info(f"🔍 Extracted user ID from name: {user_id}")
+            return user_id
+    
+    # Method 3: Use the full name for user search via users.list
+    if employee_name:
+        # Use the exact name for user search
+        st.info(f"🔍 Using full name for user search: {employee_name}")
+        return employee_name
+    
+    return None
+
+def fetch_photo_by_user_id(user_id: str) -> Optional[bytes]:
+    """Fetch user photo using KPA users.info endpoint"""
+    if not employee_id or not KPA_TOKEN:
+        return None
+    
+    try:
+        # Try the users.info endpoint to get user details including photo
+        data = {"token": KPA_TOKEN, "user_id": employee_id}
+        resp = requests.post(f"{API_BASE}/users.info", json=data, timeout=10)
+        
+        if resp.status_code == 200:
+            result = resp.json()
+            st.write(f"🔍 Users.info API Response: {result}")
+            
+            if result.get('ok'):
+                user_data = result.get('user', {})
+                
+                # Look for photo/avatar URL in the user data
+                photo_url = None
+                for url_field in ["photo_url", "avatar_url", "profile_photo", "image_url", "photo", "avatar"]:
+                    if url_field in user_data:
+                        photo_url = user_data[url_field]
+                        st.info(f"✅ Found photo URL in field: {url_field}")
+                        break
+                
+                if photo_url:
+                    # Download the actual photo
+                    img_resp = requests.get(photo_url, timeout=10)
+                    if img_resp.status_code == 200:
+                        st.success(f"📸 Photo loaded for user ID: {employee_id}")
+                        return img_resp.content
+                    else:
+                        st.warning(f"⚠️ Photo download failed: HTTP {img_resp.status_code}")
+                else:
+                    st.warning("⚠️ No photo URL found in user info response")
+                    st.write(f"Available user fields: {list(user_data.keys())}")
+            else:
+                st.warning(f"⚠️ Users.info API returned ok=False: {result.get('error', 'Unknown error')}")
+        else:
+            st.warning(f"⚠️ Users.info API error: HTTP {resp.status_code} - {resp.text}")
+            
+    except Exception as e:
+        st.warning(f"⚠️ Users.info API error: {str(e)}")
+    
+    # Try alternative: users.list to search for the user
+    try:
+        st.info(f"🔍 Trying users.list to find user: {employee_id}")
+        search_data = {"token": KPA_TOKEN, "query": employee_id, "limit": 5}
+        resp = requests.post(f"{API_BASE}/users.list", json=search_data, timeout=10)
+        
+        if resp.status_code == 200:
+            result = resp.json()
+            st.write(f"🔍 Users.list API Response: {result}")
+            
+            if result.get('ok') and result.get('users'):
+                users = result.get('users', [])
+                if users:
+                    # Use the first matching user
+                    user_data = users[0]
+                    st.info(f"✅ Found user in users.list: {user_data.get('name', 'Unknown')}")
+                    
+                    # Look for photo URL in the user data
+                    photo_url = None
+                    for url_field in ["photo_url", "avatar_url", "profile_photo", "image_url", "photo", "avatar"]:
+                        if url_field in user_data:
+                            photo_url = user_data[url_field]
+                            st.info(f"✅ Found photo URL in field: {url_field}")
+                            break
+                    
+                    if photo_url:
+                        # Download the actual photo
+                        img_resp = requests.get(photo_url, timeout=10)
+                        if img_resp.status_code == 200:
+                            st.success(f"📸 Photo loaded from users.list for: {employee_id}")
+                            return img_resp.content
+                        else:
+                            st.warning(f"⚠️ Photo download failed: HTTP {img_resp.status_code}")
+                    else:
+                        st.warning("⚠️ No photo URL found in users.list response")
+                        st.write(f"Available user fields: {list(user_data.keys())}")
+                else:
+                    st.warning(f"⚠️ No users found matching: {employee_id}")
+            else:
+                st.warning(f"⚠️ Users.list API returned ok=False: {result.get('error', 'Unknown error')}")
+        else:
+            st.warning(f"⚠️ Users.list API error: HTTP {resp.status_code} - {resp.text}")
+            
+    except Exception as e:
+        st.warning(f"⚠️ Users.list API error: {str(e)}")
+    
+    return None
+
 def extract_key_from_tenant_url(url: str) -> Optional[str]:
     """From https://<tenant>.kpaehs.com/get-upload?key=ENCODED → 'private/.../image.jpg'"""
     if not isinstance(url, str) or "get-upload" not in url:
@@ -142,8 +271,26 @@ def extract_key_from_tenant_url(url: str) -> Optional[str]:
     except Exception:
         return None
 
-def fetch_photo_bytes(photo_field: str) -> Optional[bytes]:
-    """Accepts either a tenant URL or a raw storage key; returns image bytes via proxy or direct API."""
+def fetch_photo_bytes(photo_field: str, employee_name: str = "") -> Optional[bytes]:
+    """Fetch photo using employee ID (preferred) or fallback to attachment key approach"""
+    if not photo_field and not employee_name:
+        return None
+    
+    # Check token availability
+    if not KPA_TOKEN:
+        return None
+    
+    # Method 1: Try user photo endpoint first (preferred approach)
+    user_id = extract_user_id(employee_name, photo_field)
+    if user_id:
+        st.info(f"🎯 Trying user photo endpoint for: {user_id}")
+        photo_bytes = fetch_photo_by_user_id(user_id)
+        if photo_bytes:
+            return photo_bytes
+        else:
+            st.info("⏭️ User endpoint failed, trying attachment approach...")
+    
+    # Method 2: Fallback to original attachment-based approach
     key = extract_key_from_tenant_url(photo_field) if "get-upload" in (photo_field or "") else photo_field
     if not key:
         return None
@@ -158,15 +305,16 @@ def fetch_photo_bytes(photo_field: str) -> Optional[bytes]:
     if is_cloud:
         # Cloud deployment - use direct KPA API (skip proxy)
         try:
+            # Try 1: Use attachments.download endpoint
             data = {"token": KPA_TOKEN, "key": key}
-            resp = requests.post(f"{API_BASE}/files.get_url", json=data, timeout=10)
+            resp = requests.post(f"{API_BASE}/attachments.download", json=data, timeout=10)
             if resp.status_code == 200:
                 url_data = resp.json()
-                st.write(f"🔍 KPA API Response: {url_data}")  # Debug the actual response
+                st.write(f"🔍 Attachments Download Response: {url_data}")
                 
                 # Try different possible field names for the download URL
                 download_url = None
-                for url_field in ["url", "download_url", "file_url", "link", "downloadUrl", "fileUrl"]:
+                for url_field in ["url", "download_url", "file_url", "link", "downloadUrl", "fileUrl", "photo_url"]:
                     if url_field in url_data:
                         download_url = url_data[url_field]
                         st.info(f"✅ Found download URL in field: {url_field}")
@@ -175,17 +323,51 @@ def fetch_photo_bytes(photo_field: str) -> Optional[bytes]:
                 if download_url:
                     img_resp = requests.get(download_url, timeout=10)
                     if img_resp.status_code == 200:
-                        st.success("📸 Photo loaded successfully!")
+                        st.success("📸 Photo loaded successfully via attachments.download!")
                         return img_resp.content
-                    else:
-                        st.warning(f"⚠️ Photo download failed: HTTP {img_resp.status_code}")
-                else:
-                    st.warning("⚠️ KPA API response missing download URL")
-                    st.write(f"Available fields: {list(url_data.keys())}")
             else:
-                st.warning(f"⚠️ KPA API error: HTTP {resp.status_code}")
+                st.write(f"🔍 Attachments Download Response: {resp.json()}")
         except Exception as e:
-            st.error(f"❌ Photo fetch error: {str(e)}")
+            st.warning(f"⚠️ Attachments download failed: {str(e)}")
+        
+        try:
+            # Try 2: Use photos.get endpoint
+            data = {"token": KPA_TOKEN, "key": key}
+            resp = requests.post(f"{API_BASE}/photos.get", json=data, timeout=10)
+            if resp.status_code == 200:
+                url_data = resp.json()
+                st.write(f"🔍 Photos Get Response: {url_data}")
+                
+                # Try different possible field names for the download URL
+                download_url = None
+                for url_field in ["url", "download_url", "file_url", "link", "downloadUrl", "fileUrl", "photo_url"]:
+                    if url_field in url_data:
+                        download_url = url_data[url_field]
+                        st.info(f"✅ Found download URL in field: {url_field}")
+                        break
+                
+                if download_url:
+                    img_resp = requests.get(download_url, timeout=10)
+                    if img_resp.status_code == 200:
+                        st.success("📸 Photo loaded successfully via photos.get!")
+                        return img_resp.content
+            else:
+                st.write(f"🔍 Photos Get Response: {resp.json()}")
+        except Exception as e:
+            st.warning(f"⚠️ Photos.get failed: {str(e)}")
+            
+        try:
+            # Try 3: Direct photo URL approach (if it's already a full URL)
+            if photo_field.startswith("http"):
+                st.info(f"🔗 Trying direct photo URL: {photo_field}")
+                img_resp = requests.get(photo_field, timeout=10)
+                if img_resp.status_code == 200:
+                    st.success("📸 Photo loaded directly from URL!")
+                    return img_resp.content
+                else:
+                    st.warning(f"⚠️ Direct URL failed: HTTP {img_resp.status_code}")
+        except Exception as e:
+            st.warning(f"⚠️ Direct URL fetch failed: {str(e)}")
     else:
         # Local development - try proxy first, then direct API
         try:
@@ -198,15 +380,16 @@ def fetch_photo_bytes(photo_field: str) -> Optional[bytes]:
         
         # Fallback to direct KPA API for local too
         try:
+            # Try the attachments.download endpoint first
             data = {"token": KPA_TOKEN, "key": key}
-            resp = requests.post(f"{API_BASE}/files.get_url", json=data, timeout=10)
+            resp = requests.post(f"{API_BASE}/attachments.download", json=data, timeout=10)
             if resp.status_code == 200:
                 url_data = resp.json()
-                st.write(f"🔍 KPA API Response (local fallback): {url_data}")  # Debug the actual response
+                st.write(f"🔍 KPA API Response (local fallback): {url_data}")
                 
                 # Try different possible field names for the download URL
                 download_url = None
-                for url_field in ["url", "download_url", "file_url", "link", "downloadUrl", "fileUrl"]:
+                for url_field in ["url", "download_url", "file_url", "link", "downloadUrl", "fileUrl", "photo_url"]:
                     if url_field in url_data:
                         download_url = url_data[url_field]
                         st.info(f"✅ Found download URL in field: {url_field}")
@@ -1036,7 +1219,7 @@ if csv_file:
         # Fetch photo server-side via API token
         with st.spinner("🖼️ Fetching winner photo..."):
             try:
-                photo_bytes = fetch_photo_bytes(photo_field)
+                photo_bytes = fetch_photo_bytes(photo_field, name)  # Pass employee name for ID extraction
                 if photo_bytes:
                     st.success("✅ Photo loaded successfully!")
                 else:
