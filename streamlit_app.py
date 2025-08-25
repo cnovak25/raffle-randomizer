@@ -71,7 +71,27 @@ COL_PHOTO_URL = "Photo of the employee holding the ticket. (Will be used if draw
 API_BASE = "https://api.kpaehs.com/v1" 
 # Try to use local proxy first, fallback to direct API for cloud deployment
 PHOTO_PROXY_URL = os.getenv("PHOTO_PROXY_URL", "http://localhost:5001/api/v1/photos/proxy")
-KPA_TOKEN = st.secrets.get("KPA_TOKEN") if hasattr(st, 'secrets') and "KPA_TOKEN" in st.secrets else os.getenv("KPA_TOKEN")
+
+# Enhanced token access with better debugging
+KPA_TOKEN = None
+try:
+    # Try Streamlit secrets first (cloud deployment)
+    if hasattr(st, 'secrets') and st.secrets:
+        KPA_TOKEN = st.secrets.get("KPA_TOKEN", None)
+        if KPA_TOKEN:
+            st.success(f"✅ KPA_TOKEN loaded from Streamlit secrets (length: {len(KPA_TOKEN)})")
+        else:
+            st.warning("⚠️ KPA_TOKEN not found in Streamlit secrets")
+    # Fallback to environment variable (local development)
+    if not KPA_TOKEN:
+        KPA_TOKEN = os.getenv("KPA_TOKEN")
+        if KPA_TOKEN:
+            st.info(f"ℹ️ KPA_TOKEN loaded from environment (length: {len(KPA_TOKEN)})")
+        else:
+            st.error("❌ KPA_TOKEN not found in secrets or environment variables")
+except Exception as e:
+    st.error(f"❌ Error accessing KPA_TOKEN: {str(e)}")
+    KPA_TOKEN = None
 
 def extract_key_from_tenant_url(url: str) -> str | None:
     """From https://<tenant>.kpaehs.com/get-upload?key=ENCODED → 'private/.../image.jpg'"""
@@ -91,23 +111,15 @@ def fetch_photo_bytes(photo_field: str) -> bytes | None:
     if not key:
         return None
     
-    # Debug info for cloud deployment
-    has_token = bool(KPA_TOKEN)
-    if not has_token:
-        st.info("ℹ️ KPA_TOKEN not found - photos will show placeholders")
+    # Check token availability
+    if not KPA_TOKEN:
         return None
     
-    # Try photo proxy first (local development)
-    try:
-        resp = requests.get(f"{PHOTO_PROXY_URL}?key={key}", timeout=10)
-        if resp.status_code == 200:
-            st.success("✅ Photo loaded via proxy")
-            return resp.content
-    except Exception:
-        pass  # Fallback to direct API
+    # Detect cloud environment and prioritize direct API
+    is_cloud = not os.path.exists("/workspaces") and hasattr(st, 'secrets')
     
-    # Fallback to direct KPA API (cloud deployment)
-    if KPA_TOKEN:
+    if is_cloud:
+        # Cloud deployment - use direct KPA API (skip proxy)
         try:
             data = {"token": KPA_TOKEN, "key": key}
             resp = requests.post(f"{API_BASE}/files.get_url", json=data, timeout=10)
@@ -116,16 +128,39 @@ def fetch_photo_bytes(photo_field: str) -> bytes | None:
                 if "url" in url_data:
                     img_resp = requests.get(url_data["url"], timeout=10)
                     if img_resp.status_code == 200:
-                        st.success("✅ Photo loaded via KPA API")
+                        st.success("📸 Photo loaded successfully!")
                         return img_resp.content
                     else:
-                        st.warning(f"⚠️ Failed to download photo: HTTP {img_resp.status_code}")
+                        st.warning(f"⚠️ Photo download failed: HTTP {img_resp.status_code}")
                 else:
-                    st.warning("⚠️ KPA API didn't return download URL")
+                    st.warning("⚠️ KPA API response missing download URL")
             else:
                 st.warning(f"⚠️ KPA API error: HTTP {resp.status_code}")
         except Exception as e:
-            st.warning(f"⚠️ Photo unavailable: {str(e)}")
+            st.error(f"❌ Photo fetch error: {str(e)}")
+    else:
+        # Local development - try proxy first, then direct API
+        try:
+            resp = requests.get(f"{PHOTO_PROXY_URL}?key={key}", timeout=10)
+            if resp.status_code == 200:
+                st.success("📸 Photo loaded via proxy!")
+                return resp.content
+        except Exception:
+            pass  # Continue to direct API
+        
+        # Fallback to direct KPA API for local too
+        try:
+            data = {"token": KPA_TOKEN, "key": key}
+            resp = requests.post(f"{API_BASE}/files.get_url", json=data, timeout=10)
+            if resp.status_code == 200:
+                url_data = resp.json()
+                if "url" in url_data:
+                    img_resp = requests.get(url_data["url"], timeout=10)
+                    if img_resp.status_code == 200:
+                        st.success("📸 Photo loaded via KPA API!")
+                        return img_resp.content
+        except Exception as e:
+            st.error(f"❌ Photo API error: {str(e)}")
     
     return None
 
