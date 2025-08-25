@@ -169,12 +169,12 @@ def extract_user_id(employee_name: str, photo_field: str) -> Optional[str]:
 
 def fetch_photo_by_user_id(user_id: str) -> Optional[bytes]:
     """Fetch user photo using KPA users.info endpoint"""
-    if not employee_id or not KPA_TOKEN:
+    if not user_id or not KPA_TOKEN:
         return None
     
     try:
         # Try the users.info endpoint to get user details including photo
-        data = {"token": KPA_TOKEN, "user_id": employee_id}
+        data = {"token": KPA_TOKEN, "user_id": user_id}
         resp = requests.post(f"{API_BASE}/users.info", json=data, timeout=10)
         
         if resp.status_code == 200:
@@ -196,7 +196,7 @@ def fetch_photo_by_user_id(user_id: str) -> Optional[bytes]:
                     # Download the actual photo
                     img_resp = requests.get(photo_url, timeout=10)
                     if img_resp.status_code == 200:
-                        st.success(f"📸 Photo loaded for user ID: {employee_id}")
+                        st.success(f"📸 Photo loaded for user ID: {user_id}")
                         return img_resp.content
                     else:
                         st.warning(f"⚠️ Photo download failed: HTTP {img_resp.status_code}")
@@ -213,8 +213,8 @@ def fetch_photo_by_user_id(user_id: str) -> Optional[bytes]:
     
     # Try alternative: users.list to search for the user
     try:
-        st.info(f"🔍 Trying users.list to find user: {employee_id}")
-        search_data = {"token": KPA_TOKEN, "query": employee_id, "limit": 5}
+        st.info(f"🔍 Trying users.list to find user: {user_id}")
+        search_data = {"token": KPA_TOKEN, "query": user_id, "limit": 5}
         resp = requests.post(f"{API_BASE}/users.list", json=search_data, timeout=10)
         
         if resp.status_code == 200:
@@ -240,7 +240,7 @@ def fetch_photo_by_user_id(user_id: str) -> Optional[bytes]:
                         # Download the actual photo
                         img_resp = requests.get(photo_url, timeout=10)
                         if img_resp.status_code == 200:
-                            st.success(f"📸 Photo loaded from users.list for: {employee_id}")
+                            st.success(f"📸 Photo loaded from users.list for: {user_id}")
                             return img_resp.content
                         else:
                             st.warning(f"⚠️ Photo download failed: HTTP {img_resp.status_code}")
@@ -248,7 +248,7 @@ def fetch_photo_by_user_id(user_id: str) -> Optional[bytes]:
                         st.warning("⚠️ No photo URL found in users.list response")
                         st.write(f"Available user fields: {list(user_data.keys())}")
                 else:
-                    st.warning(f"⚠️ No users found matching: {employee_id}")
+                    st.warning(f"⚠️ No users found matching: {user_id}")
             else:
                 st.warning(f"⚠️ Users.list API returned ok=False: {result.get('error', 'Unknown error')}")
         else:
