@@ -1,8 +1,6 @@
 [server]
-# Streamlit Cloud configuration - correct port
+# Streamlit Cloud configuration - use standard port for health check
 headless = true
-port = 8502
-address = "0.0.0.0"
 enableCORS = false
 enableXsrfProtection = false
 
