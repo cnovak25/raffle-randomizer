@@ -18,6 +18,60 @@ st.set_page_config(
     }
 )
 
+# Apply CSS immediately after page config to prevent text rendering
+st.markdown("""
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fredoka+One:wght@400&family=Poppins:wght@300;400;600;700&display=swap');
+
+/* Mobile-first responsive design */
+.main-header {
+    font-family: 'Fredoka One', cursive !important;
+    font-size: clamp(2rem, 5vw, 3.5rem) !important;
+    text-align: center !important;
+    background: linear-gradient(45deg, #FF6B6B, #4ECDC4, #45B7D1, #96CEB4, #FECA57) !important;
+    background-size: 300% 300% !important;
+    animation: rainbow 3s ease infinite !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+    margin: 0 !important;
+    letter-spacing: 0.1em !important;
+    word-spacing: 0.2em !important;
+    display: block !important;
+    width: 100% !important;
+    line-height: 1.2 !important;
+}
+
+@keyframes rainbow {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+.subtitle {
+    font-family: 'Poppins', sans-serif !important;
+    font-size: clamp(0.9rem, 2.5vw, 1.2rem) !important;
+    text-align: center !important;
+    color: #666 !important;
+    margin: 0 !important;
+    line-height: 1.4 !important;
+}
+
+/* Mobile responsive containers */
+@media screen and (max-width: 768px) {
+    .main-header {
+        font-size: 2.5rem !important;
+        line-height: 1.1 !important;
+        margin-bottom: 1rem !important;
+    }
+    .subtitle {
+        font-size: 1rem !important;
+        margin-bottom: 1.5rem !important;
+    }
+}
+</style>
+""", unsafe_allow_html=True)
+
 # ── Logo and branding functions ──────────────────────────────────────────────
 def load_mvn_logo():
     """Load the MVN logo and convert to base64 for display"""
@@ -700,9 +754,6 @@ if 'celebration_mode' not in st.session_state:
     st.session_state.celebration_mode = False
 if 'winner_announced' not in st.session_state:
     st.session_state.winner_announced = False
-
-# Apply celebration CSS
-add_celebration_css()
 
 # Header with MVN logos
 display_header_with_logo()
