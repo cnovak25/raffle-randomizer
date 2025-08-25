@@ -8,6 +8,9 @@ import time
 from datetime import datetime
 import json
 import os
+import subprocess
+import signal
+import atexit
 import streamlit as st
 from PIL import Image
 import plotly.graph_objects as go
@@ -17,6 +20,77 @@ import requests
 KPA_AVAILABLE = True
 # Configuration
 KPA_API_URL = "http://localhost:5001/api/v1"
+
+def start_flask_server():
+    """Start the Flask API server as a subprocess"""
+    if 'flask_process' not in st.session_state or st.session_state.flask_process is None:
+        try:
+            # Start the Flask server process
+            flask_process = subprocess.Popen(
+                ['python3', 'kpa_api_server.py'],
+                cwd=os.getcwd(),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                preexec_fn=os.setsid if hasattr(os, 'setsid') else None
+            )
+            
+            st.session_state.flask_process = flask_process
+            st.session_state.flask_start_time = time.time()
+            
+            # Wait a moment for the server to start
+            time.sleep(3)
+            
+            # Register cleanup function
+            def cleanup_flask():
+                if 'flask_process' in st.session_state and st.session_state.flask_process:
+                    try:
+                        if hasattr(os, 'killpg'):
+                            os.killpg(os.getpgid(st.session_state.flask_process.pid), signal.SIGTERM)
+                        else:
+                            st.session_state.flask_process.terminate()
+                    except:
+                        pass
+            
+            atexit.register(cleanup_flask)
+            return True
+            
+        except Exception as e:
+            st.error(f"Failed to start Flask server: {e}")
+            return False
+    return True
+
+def check_flask_server():
+    """Check if Flask server is running and start if needed"""
+    try:
+        response = requests.get(f"{KPA_API_URL}/health", timeout=2)
+        if response.status_code == 200:
+            return True
+    except:
+        pass
+    
+    # Server not responding, try to start it
+    return start_flask_server()
+
+def stop_flask_server():
+    """Stop the Flask server subprocess"""
+    if 'flask_process' in st.session_state and st.session_state.flask_process:
+        try:
+            if hasattr(os, 'killpg'):
+                os.killpg(os.getpgid(st.session_state.flask_process.pid), signal.SIGTERM)
+            else:
+                st.session_state.flask_process.terminate()
+            st.session_state.flask_process = None
+        except Exception as e:
+            st.error(f"Error stopping Flask server: {e}")
+
+# Ensure Flask server is running
+if 'flask_initialized' not in st.session_state:
+    st.session_state.flask_initialized = True
+    with st.spinner("🚀 Starting KPA API server..."):
+        if check_flask_server():
+            st.success("✅ KPA API server started successfully!")
+        else:
+            st.error("❌ Failed to start KPA API server")
 
 def run_app():
     st.set_page_config(page_title="🎉 The MVN Great Save Raffle 🎉", page_icon="🎟️", layout="wide")
@@ -122,6 +196,76 @@ def run_app():
     </style>
     """, unsafe_allow_html=True)
 
+def get_employee_photo(employee_id):
+    """Get employee photo from KPA API using employee ID"""
+    if not employee_id:
+        return None
+        
+    try:
+        # First, try to get photo from KPA submissions to find the photo key
+        response = requests.get(f"{KPA_API_URL}/forms/submissions?form_id=289228&limit=100", 
+                              headers={'Content-Type': 'application/json'}, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            submissions = data.get('submissions', [])
+            
+            # Find the submission with matching employee_id
+            for submission in submissions:
+                if submission.get('employee_id') == employee_id:
+                    photos = submission.get('photos', [])
+                    if photos and len(photos) > 0:
+                        photo_url = photos[0].get('url')  # Get proxied photo URL
+                        return photo_url
+                        
+        return None
+        
+    except Exception as e:
+        st.error(f"Error getting photo for {employee_id}: {str(e)}")
+        return None
+
+def create_winner_card(winner_data, show_photo=True):
+    """Create a beautiful winner card with name and photo"""
+    winner_name = winner_data.get('employee_name', winner_data.get('name', 'Unknown'))
+    employee_id = winner_data.get('employee_id', '')
+    department = winner_data.get('department', 'N/A')
+    location = winner_data.get('location', 'N/A')
+    
+    # Create the card layout
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col2:
+        st.markdown(f"""
+        <div class="mega-winner">
+            <h1 style="text-align: center; color: #ff6b6b; margin-bottom: 20px;">🎉 WINNER! 🎉</h1>
+        """, unsafe_allow_html=True)
+        
+        # Show photo if available and requested
+        if show_photo and employee_id:
+            photo_url = get_employee_photo(employee_id)
+            if photo_url:
+                try:
+                    st.image(photo_url, width=300, caption=f"📸 {winner_name}")
+                except Exception as e:
+                    st.warning(f"Could not load photo: {str(e)}")
+                    st.markdown("📷 *Photo not available*")
+            else:
+                st.markdown("📷 *Photo not available*")
+        
+        # Winner details
+        st.markdown(f"""
+            <div style="text-align: center; margin: 20px 0;">
+                <h2 style="color: #4ecdc4; font-size: 2.5em;">{winner_name}</h2>
+                <p style="font-size: 1.2em; color: #666;">
+                    <strong>Employee ID:</strong> {employee_id}<br>
+                    <strong>Department:</strong> {department}<br>
+                    <strong>Location:</strong> {location}
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+
     def save_winner_history():
         """Save winner history to a JSON file"""
         try:
@@ -141,6 +285,16 @@ def run_app():
 
     # Load history on startup
     load_winner_history()
+    
+    # Initialize and auto-start Flask server
+    if not check_flask_server():
+        with st.spinner("🚀 Starting KPA API server..."):
+            if start_flask_server():
+                st.success("✅ KPA API server started successfully!")
+                time.sleep(2)  # Give server time to fully initialize
+                st.rerun()  # Refresh to update connection status
+            else:
+                st.error("❌ Failed to start KPA API server")
 
     # MVN Logo header (same as before)
     col1, col2, col3 = st.columns([1, 3, 1])
@@ -189,11 +343,8 @@ def run_app():
     </div>
     """, unsafe_allow_html=True)
     
-    # Create tabs with KPA integration
-    if KPA_AVAILABLE:
-        tab1, tab2, tab3, tab4, tab5 = st.tabs(["🎰 Raffle Draw", "🔗 KPA Integration", "🏆 Hall of Fame", "📊 Leaderboard", "⚙️ Settings"])
-    else:
-        tab1, tab3, tab4, tab5 = st.tabs(["🎰 Raffle Draw", "🏆 Hall of Fame", "📊 Leaderboard", "⚙️ Settings"])
+    # Create tabs - simplified interface with KPA integration built into main tab
+    tab1, tab2, tab3, tab4 = st.tabs(["🎰 Raffle Draw", "🏆 Hall of Fame", "📊 Leaderboard", "⚙️ Settings"])
     
     with tab1:
         st.markdown("<p style='text-align: center; font-size: 1.5em;'>Get ready for the most EPIC winner announcement!</p>", unsafe_allow_html=True)
@@ -244,123 +395,135 @@ def run_app():
             st.markdown("---")
 
         # Original manual load methods
-        st.markdown("### 📊 Manual Data Loading")
+        st.markdown("### 📊 Data Loading")
         
-        # Auto-load from Google Sheets
-        if st.button("📊 Load MVN Raffle Data (Google Sheets)", type="secondary"):
-            if load_google_sheets_data():
-                st.rerun()
+        # Primary KPA loading interface
+        if KPA_AVAILABLE and kpa_status == "connected":
+            st.markdown("""
+            <div class='kpa-section'>
+                <h3>🔗 Automated KPA Data Loading</h3>
+                <p>All raffle data is automatically loaded from the KPA Great Save Raffle form with photos included</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("� Load MVN Raffle Data (KPA)", type="primary", use_container_width=True):
+                    if load_kpa_participants("all", "All Locations", 30):
+                        st.success("✅ Participants loaded from KPA Great Save Raffle form!")
+                        st.rerun()
+            
+            with col2:
+                if st.button("🔄 Refresh KPA Data", type="secondary", use_container_width=True):
+                    if load_kpa_participants("all", "All Locations", 30):
+                        st.success("✅ Data refreshed from KPA!")
+                        st.rerun()
+            
+            st.info("📸 Photos are automatically included from KPA form submissions")
+        else:
+            st.error("❌ KPA API Server not running")
+            st.info("💡 Start the KPA API server to access raffle data")
+            st.info("🔧 Go to Settings tab to start the server")
 
         st.markdown("---")
         
-        # File uploaders (same as before)
-        col1, col2 = st.columns(2)
-        with col1:
-            uploaded_excel = st.file_uploader("📊 Upload Excel/CSV file", type=["xlsx", "csv"])
-            
-            st.markdown("**OR**")
-            cloud_csv_url = st.text_input(
-                "☁️ Load CSV from Cloud URL:",
-                placeholder="Dropbox or Google Sheets sharing link",
-                help="Supports Dropbox sharing links and Google Sheets sharing links"
-            )
-            
-            if cloud_csv_url and st.button("📥 Load CSV from Cloud"):
-                if load_cloud_csv(cloud_csv_url):
-                    st.rerun()
-            
-        with col2:
-            st.info("📸 **Photo Options:**")
-            st.success("🌐 **Recommended:** Use image URLs in your CSV")
-            st.info("🔗 **KPA Integration:** Automatic photo retrieval")
-            uploaded_zip = st.file_uploader("🖼️ Optional: Upload ZIP with local images", type=["zip"])
+        # CSV Upload Section - RECOMMENDED APPROACH
+        st.markdown("""
+        <div class='kpa-section' style='background: #e8f5e8; border-left: 5px solid #4CAF50;'>
+            <h3>📄 CSV Upload Method (Recommended)</h3>
+            <p><strong>💡 Simple & Reliable:</strong> Download CSV from KPA → Upload here → Get photos via API</p>
+            <p>✅ Real employee names | ✅ All participant data | ✅ Photos from API</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("📤 Upload CSV Data", type="primary", use_container_width=True):
+            csv_data = load_csv_participants()
+            if csv_data is not None:
+                st.session_state.df = csv_data
+                st.success("🎯 Ready to run raffle with CSV data + API photos!")
+                st.rerun()
 
-        # Rest of the raffle logic (same as before)
-        if uploaded_zip is not None:
-            try:
-                st.session_state.images = extract_images_from_zip(uploaded_zip)
-                st.success(f"🎯 Loaded {len(st.session_state.images)} local images from ZIP!")
-            except Exception as e:
-                st.error(f"Error loading ZIP: {e}")
-
-        if uploaded_excel is not None:
-            process_uploaded_file(uploaded_excel)
+        st.markdown("---")
 
         # Show raffle interface if data is loaded
         if 'df' in st.session_state and len(st.session_state.df) > 0:
             show_raffle_interface()
 
-    # KPA Integration Tab
-    if KPA_AVAILABLE:
-        with tab2:
-            st.markdown("""
-            <div class='kpa-section'>
-                <h2>🔗 KPA Integration Status</h2>
-                <p>Direct connection to KPA Great Save Raffle form (ID: 289228)</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # KPA Status Display
-            if kpa_status == "connected":
-                st.success("✅ KPA API Server is running and connected!")
-                st.info("📋 Form ID: 289228 (Great Save Raffle)")
-                
-                # Test connection button
-                if st.button("🔄 Test KPA Connection"):
-                    try:
-                        response = requests.get(f"{KPA_API_URL}/api/participants", timeout=10)
-                        if response.status_code == 200:
-                            data = response.json()
-                            participant_count = len(data.get('participants', []))
-                            st.success(f"✅ Connection successful! Found {participant_count} participant(s)")
-                        else:
-                            st.error(f"❌ API Error: {response.status_code}")
-                    except Exception as e:
-                        st.error(f"❌ Connection failed: {str(e)}")
-            else:
-                st.error("❌ KPA API Server not running")
-                st.info("💡 Start the KPA API server with: `python3 kpa_api_server.py`")
-            
-            st.markdown("---")
-            
-            # KPA Direct Load UI (if connected)
-            if kpa_status == "connected":
-                st.markdown("""
-                <div class='kpa-section'>
-                    <h3>🚀 Load Participants from KPA</h3>
-                    <p>Automatically fetch participants from the Great Save Raffle form</p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("📥 Load All Participants", key="kpa_load_all"):
-                        if load_kpa_participants("all", "All Locations", 30):
-                            st.success("✅ Participants loaded from KPA!")
-                        
-                with col2:
-                    if st.button("🔄 Refresh Data", key="kpa_refresh"):
-                        if load_kpa_participants("all", "All Locations", 30):
-                            st.success("✅ Data refreshed from KPA!")
-            else:
-                st.info("⚠️ Start KPA API server to use automated participant loading")
-
-    # Hall of Fame and Leaderboard (same as before)
-    with tab3:
+    # Hall of Fame and Leaderboard tabs
+    with tab2:
         show_hall_of_fame()
 
-    with tab4:
+    with tab3:
         show_leaderboard()
 
-    with tab5:
+    with tab4:
         show_settings()
 
+def load_csv_participants():
+    """Load participants from uploaded CSV file"""
+    st.subheader("📄 Upload Participant CSV")
+    st.info("💡 Download the participant CSV from KPA, then upload it here for reliable data with real names!")
+    
+    uploaded_file = st.file_uploader(
+        "Upload CSV file with participant data", 
+        type=['csv'],
+        help="CSV should include columns: employee_name, employee_id, department, location, etc."
+    )
+    
+    if uploaded_file is not None:
+        try:
+            # Read the CSV file
+            df = pd.read_csv(uploaded_file)
+            
+            # Display preview of the data
+            st.success(f"✅ Successfully loaded {len(df)} participants from CSV")
+            st.write("**Data Preview:**")
+            st.dataframe(df.head(), use_container_width=True)
+            
+            # Validate required columns
+            required_columns = ['employee_name', 'employee_id']
+            missing_columns = [col for col in required_columns if col not in df.columns]
+            
+            if missing_columns:
+                st.error(f"❌ Missing required columns: {missing_columns}")
+                st.info("Required columns: employee_name, employee_id")
+                return None
+            
+            # Add any missing optional columns
+            optional_columns = {
+                'department': 'N/A',
+                'location': 'N/A', 
+                'email': 'N/A',
+                'observer_name': 'N/A',
+                'prize_level': 'Standard'
+            }
+            
+            for col, default_value in optional_columns.items():
+                if col not in df.columns:
+                    df[col] = default_value
+            
+            # Store in session state
+            st.session_state.csv_participants = df
+            return df
+            
+        except Exception as e:
+            st.error(f"❌ Error reading CSV file: {str(e)}")
+            return None
+    
+    return None
+
 def load_kpa_participants(prize_level, location, date_range):
-    """Load participants from KPA Flask API with filters"""
+    """Load participants from KPA Flask API with filters - SIMPLIFIED VERSION"""
     try:
         with st.spinner("🔄 Loading participants from KPA..."):
+            # Simple headers for local Flask API
+            headers = {
+                'Content-Type': 'application/json'
+            }
+            
             # Call our Flask API to get participants from KPA form
-            response = requests.get(f"{KPA_API_URL}/forms/submissions?form_id=289228&limit=100", timeout=30)
+            response = requests.get(f"{KPA_API_URL}/forms/submissions?form_id=289228&limit=100", 
+                                  headers=headers, timeout=30)
             
             if response.status_code == 200:
                 data = response.json()
@@ -370,15 +533,27 @@ def load_kpa_participants(prize_level, location, date_range):
                     # Convert KPA submissions to participant format
                     participants = []
                     for submission in submissions:
-                        participant_data = submission.get('data', {})
+                        # Extract photo URL from photos array if available
+                        photo_url = None
+                        photos = submission.get('photos', [])
+                        if photos and len(photos) > 0:
+                            photo_url = photos[0].get('url')  # Get first photo URL
+                        
                         participants.append({
-                            'name': participant_data.get('employee_name', 'Unknown'),
-                            'email': participant_data.get('email', 'N/A'),
-                            'department': participant_data.get('department', 'N/A'),
-                            'location': participant_data.get('location', 'N/A'),
-                            'employee_id': participant_data.get('employee_id', ''),
-                            'submission_id': submission.get('id', ''),
-                            'submitted_at': submission.get('submitted_at', '')
+                            'name': submission.get('employee_name', 'Unknown'),
+                            'employee_name': submission.get('employee_name', 'Unknown'),  # For compatibility
+                            'email': submission.get('email', 'N/A'),
+                            'department': submission.get('department', 'N/A'),
+                            'location': submission.get('location', 'N/A'),
+                            'employee_id': submission.get('employee_id', ''),
+                            'observer_name': submission.get('observer_name', 'Unknown'),
+                            'prize_level': submission.get('prize_level', 'Unknown'),
+                            'description': submission.get('description', ''),
+                            'photo_url': photo_url,  # Extract from photos array
+                            'photos': photos,    # Keep full photos array
+                            'submission_id': submission.get('response_id', ''),
+                            'submitted_at': submission.get('submission_date', ''),
+                            'nominated_employee_id': submission.get('nominated_employee_id', '')
                         })
                     
                     # Convert to DataFrame
@@ -441,9 +616,109 @@ def process_uploaded_file(uploaded_file):
     pass
 
 def show_raffle_interface():
-    """Show the main raffle drawing interface"""
-    # Implementation same as before
-    pass
+    """Show the main raffle drawing interface with KPA photo support"""
+    import random
+    
+    st.markdown("## 🎰 Raffle Draw Interface")
+    
+    df = st.session_state.df
+    st.success(f"🎯 {len(df)} participants loaded and ready!")
+    
+    # Show preview of participants with photos (if available)
+    st.markdown("### 👥 Participants Preview")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown(f"**Total Participants:** {len(df)}")
+        if 'photo_url' in df.columns:
+            photos_count = df['photo_url'].notna().sum()
+            st.markdown(f"**With Photos:** {photos_count}")
+    
+    with col2:
+        if st.button("👀 Show Sample Participant"):
+            sample = df.sample(n=1).iloc[0]
+            st.markdown(f"**Sample:** {sample.get('employee_name', 'Unknown')}")
+            if pd.notna(sample.get('photo_url')):
+                try:
+                    st.image(sample['photo_url'], width=200, caption="Sample participant photo")
+                except:
+                    st.info("📷 Photo available but couldn't load preview")
+    
+    st.markdown("---")
+    
+    # Raffle drawing section
+    st.markdown("### 🎲 Draw Winner")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("🎰 DRAW WINNER", type="primary"):
+            # Select random winner
+            winner = df.sample(n=1).iloc[0]
+            
+            # Display winner with fanfare
+            st.balloons()
+            
+            # Use the new winner card function
+            create_winner_card(winner, show_photo=True)
+            
+            # Save to winner history
+            winner_record = {
+                'name': winner.get('employee_name', 'Unknown'),
+                'employee_id': winner.get('employee_id', 'Unknown'),
+                'department': winner.get('department', 'Unknown'),
+                'prize_level': winner.get('prize_level', 'Unknown'),
+                'drawn_date': datetime.now().isoformat(),
+                'drawn_by': 'KPA Raffle System',
+                'photo_url': winner.get('photo_url')
+            }
+            
+            if 'winner_history' not in st.session_state:
+                st.session_state.winner_history = []
+            st.session_state.winner_history.append(winner_record)
+            
+            # Save to file
+            try:
+                import json
+                with open('winner_history.json', 'w') as f:
+                    json.dump(st.session_state.winner_history, f)
+            except:
+                pass
+    
+    with col2:
+        if st.button("🔄 Refresh Participants"):
+            if load_kpa_participants("all", "All Locations", 30):
+                st.success("✅ Participants refreshed from KPA!")
+                st.rerun()
+    
+    with col3:
+        if st.button("📊 Show Statistics"):
+            st.markdown("### 📈 Participant Statistics")
+            if 'prize_level' in df.columns:
+                prize_counts = df['prize_level'].value_counts()
+                st.bar_chart(prize_counts)
+            
+            if 'department' in df.columns:
+                dept_counts = df['department'].value_counts().head(10)
+                st.markdown("**Top Departments:**")
+                for dept, count in dept_counts.items():
+                    st.markdown(f"- {dept}: {count} participants")
+    
+    # Participants table
+    st.markdown("### 📋 All Participants")
+    
+    # Display table with photo indicators
+    display_df = df.copy()
+    if 'photo_url' in display_df.columns:
+        display_df['Has Photo'] = display_df['photo_url'].notna().map({True: '📸', False: '❌'})
+    
+    # Select columns to display
+    display_columns = ['employee_name', 'employee_id', 'department', 'prize_level', 'observer_name']
+    if 'Has Photo' in display_df.columns:
+        display_columns.append('Has Photo')
+    
+    available_columns = [col for col in display_columns if col in display_df.columns]
+    st.dataframe(display_df[available_columns], use_container_width=True)
 
 def show_hall_of_fame():
     """Show hall of fame tab"""
@@ -460,16 +735,49 @@ def show_settings():
     st.markdown("## ⚙️ Application Settings")
     
     st.markdown("### 🔗 KPA Integration Status")
+    
+    # Flask server status and controls
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("🔄 Check Server Status"):
+            if check_flask_server():
+                st.success("✅ Flask server is running")
+            else:
+                st.error("❌ Flask server not responding")
+    
+    with col2:
+        if st.button("🚀 Start/Restart Server"):
+            stop_flask_server()
+            time.sleep(1)
+            if start_flask_server():
+                st.success("✅ Flask server started!")
+            else:
+                st.error("❌ Failed to start server")
+    
+    with col3:
+        if st.button("🛑 Stop Server"):
+            stop_flask_server()
+            st.info("🛑 Flask server stopped")
+    
+    # Show current status
     try:
-        response = requests.get(f"{KPA_API_URL}/health", timeout=5)
+        response = requests.get(f"{KPA_API_URL}/health", timeout=3)
         if response.status_code == 200:
             st.success("✅ KPA API Server Connected")
             st.info("📋 Connected to Great Save Raffle form (ID: 289228)")
+            
+            # Show Flask process info
+            if 'flask_process' in st.session_state and st.session_state.flask_process:
+                uptime = time.time() - st.session_state.get('flask_start_time', time.time())
+                st.info(f"🕐 Server uptime: {uptime:.1f} seconds")
         else:
             st.error("❌ KPA API Server Error")
     except:
         st.error("❌ KPA API Server Not Running")
-        st.info("💡 Start with: `python3 kpa_api_server.py`")
+        if st.button("� Auto-Start Server"):
+            if check_flask_server():
+                st.rerun()
     
     st.markdown("### 📊 Data Management")
     

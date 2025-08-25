@@ -1,0 +1,26 @@
+[server]
+# Enable external access
+headless = true
+port = 8502
+address = "0.0.0.0"
+enableCORS = false
+enableXsrfProtection = false
+
+# File upload settings
+maxUploadSize = 200
+
+[browser]
+# Disable usage stats collection for public deployment
+gatherUsageStats = false
+
+[theme]
+# Custom theme for mobile-friendly experience
+primaryColor = "#FF6B6B"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F0F2F6"
+textColor = "#262730"
+
+[client]
+# Mobile optimization
+showErrorDetails = false
+toolbarMode = "minimal"

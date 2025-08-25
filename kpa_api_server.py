@@ -17,7 +17,7 @@ REQUIRED INFORMATION FROM KPA TEAM:
 # OPTION 1: FLASK IMPLEMENTATION
 # =============================================================================
 
-from flask import Flask, request, jsonify, g
+from flask import Flask, request, jsonify, g, Response
 from flask_cors import CORS
 import sqlite3
 import os
@@ -53,7 +53,7 @@ rate_limit_state = {
 class Config:
     # KPA API configuration
     KPA_API_TOKEN = os.getenv('KPA_API_TOKEN')
-    KPA_BASE_URL = os.getenv('KPA_BASE_URL', 'https://your-kpa-instance.com/api')
+    KPA_BASE_URL = os.getenv('KPA_BASE_URL', 'https://api.kpaehs.com/v1')
     
     # Rate limiting (KPA Flex API: ~80 requests per minute)
     KPA_RATE_LIMIT_PER_MINUTE = int(os.getenv('KPA_RATE_LIMIT_PER_MINUTE', 75))  # Set to 75 for safety margin
@@ -62,22 +62,7 @@ class Config:
     # Database configuration
     DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///kpa_raffle.db')
     
-    # API Security - MVN Raffle App authentication
-    API_KEYS = {
-        "mvn_raffle_key": {
-            "name": "MVN Raffle App",
-            "permissions": ["read_employees", "read_photos", "write_winners"],
-            "active": True
-        },
-        "test-token-for-api-testing": {
-            "name": "Test API Key",
-            "permissions": ["read_employees", "read_photos", "write_winners", "read_forms"],
-            "active": True
-        }
-    }
-    
-    # Photo storage configuration
-    PHOTO_BASE_URL = f"{KPA_BASE_URL}/photos"
+    # Photo storage configuration  
     PHOTO_SECRET_KEY = os.getenv('PHOTO_SECRET_KEY', 'default_secret_key')
     PHOTO_EXPIRY_HOURS = 1
     
@@ -146,7 +131,7 @@ def make_kpa_request(method, endpoint, **kwargs):
     }
     
     # Ensure we have a valid token
-    if not Config.KPA_API_TOKEN or Config.KPA_API_TOKEN == 'pTfES8COPXiB3fCCE0udSxg1g2vslyB2q':
+    if not Config.KPA_API_TOKEN or Config.KPA_API_TOKEN == 'your-token-here':
         return {
             'error': 'no_authentication',
             'message': 'No valid KPA API token configured. Please set KPA_API_TOKEN in .env file',
@@ -204,123 +189,73 @@ def make_kpa_request(method, endpoint, **kwargs):
             'ok': False
         }, 500
 
-def get_okta_token():
+def lookup_employee_name(user_id):
     """
-    Get OKTA access token for KPA API authentication
-    Supports both service-to-service and user credential flows
+    Look up employee name using KPA web interface autocomplete API.
+    This uses the actual endpoint that the KPA web interface uses.
     """
-    okta_domain = os.getenv('OKTA_DOMAIN')
-    okta_client_id = os.getenv('OKTA_CLIENT_ID') 
-    okta_client_secret = os.getenv('OKTA_CLIENT_SECRET')
-    okta_scope = os.getenv('OKTA_SCOPE', 'kpa_api_access')
-    
-    # User credentials for personal SSO login
-    okta_username = os.getenv('OKTA_USERNAME')
-    okta_password = os.getenv('OKTA_PASSWORD')
-    
-    if not okta_domain:
-        logger.error("OKTA_DOMAIN not configured")
-        return None
-    
     try:
-        # Method 1: User credentials flow (Resource Owner Password Credentials)
-        if okta_username and okta_password:
-            logger.info("Using OKTA user credentials authentication")
-            token_url = f"https://{okta_domain}/oauth2/default/v1/token"
-            
-            auth_data = {
-                'grant_type': 'password',
-                'username': okta_username,
-                'password': okta_password,
-                'scope': okta_scope
-            }
-            
-            auth_headers = {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Accept': 'application/json'
-            }
-            
-            # Use client credentials if available, otherwise basic auth
-            if okta_client_id and okta_client_secret:
-                auth = (okta_client_id, okta_client_secret)
-            else:
-                auth = None
-                auth_data['client_id'] = okta_client_id if okta_client_id else 'default'
-            
-            response = requests.post(
-                token_url,
-                data=auth_data,
-                headers=auth_headers,
-                auth=auth,
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                token_data = response.json()
-                access_token = token_data.get('access_token')
-                logger.info("Successfully obtained OKTA access token via user credentials")
-                return access_token
-            else:
-                logger.error(f"OKTA user credentials authentication failed: {response.status_code} - {response.text}")
+        # Use the KPA web interface endpoint for employee lookup
+        url = f"https://mvncorp.kpaehs.com/spa-api/autocomplete/data-list-items/135212"
         
-        # Method 2: Client credentials flow (service-to-service)
-        elif okta_client_id and okta_client_secret:
-            logger.info("Using OKTA client credentials authentication")
-            token_url = f"https://{okta_domain}/oauth2/default/v1/token"
-            
-            auth_data = {
-                'grant_type': 'client_credentials',
-                'scope': okta_scope
-            }
-            
-            auth_headers = {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Accept': 'application/json'
-            }
-            
-            response = requests.post(
-                token_url,
-                data=auth_data,
-                headers=auth_headers,
-                auth=(okta_client_id, okta_client_secret),
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                token_data = response.json()
-                access_token = token_data.get('access_token')
-                logger.info("Successfully obtained OKTA access token via client credentials")
-                return access_token
-            else:
-                logger.error(f"OKTA client credentials authentication failed: {response.status_code} - {response.text}")
+        # Get session info from environment
+        session_cookie = os.getenv('KPA_SESSION_COOKIE', '')
+        csrf_token = os.getenv('KPA_CSRF_TOKEN', '')
         
-        else:
-            logger.error("Neither OKTA user credentials nor client credentials are configured")
-            
-        return None
-            
+        headers = {
+            'Content-Type': 'application/json',
+            'Cookie': session_cookie,
+            'isc-csrf-token': csrf_token,
+            'X-Requested-With': 'XMLHttpRequest',
+            'Origin': 'https://mvncorp.kpaehs.com',
+            'Referer': 'https://mvncorp.kpaehs.com/forms/analyze/289228',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'
+        }
+        
+        # Search payload - this searches for the user ID in the employee data list
+        payload = {
+            "search": user_id,
+            "limit": 10,
+            "offset": 0
+        }
+        
+        response = requests.post(url, headers=headers, json=payload, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            # Look for a matching employee in the results
+            if 'items' in data and data['items']:
+                for item in data['items']:
+                    # Check if this item contains our user ID
+                    if 'value' in item and user_id in str(item.get('value', '')):
+                        # Extract the display name
+                        display_name = item.get('label', item.get('text', ''))
+                        # Filter out meaningless responses
+                        if display_name and display_name != user_id and not any(bad_phrase in display_name.lower() for bad_phrase in ['does not qualify', 'not qualify', 'unknown', 'invalid']):
+                            logger.info(f"Found employee name for {user_id}: {display_name}")
+                            return display_name
+                            
+                # If no exact match, try the first result but be more selective
+                if data['items']:
+                    first_item = data['items'][0]
+                    display_name = first_item.get('label', first_item.get('text', ''))
+                    # Only use it if it looks like a real name, not system data
+                    if display_name and not any(bad_phrase in display_name.lower() for bad_phrase in ['does not qualify', 'not qualify', 'unknown', 'invalid', 'system', 'error']):
+                        logger.info(f"Using filtered result for {user_id}: {display_name}")
+                        return display_name
+        
+        logger.warning(f"No valid employee name found for user ID: {user_id}")
+        return "Unknown"
+        
     except Exception as e:
-        logger.error(f"Error getting OKTA token: {str(e)}")
-        return None
+        logger.error(f"Error looking up employee name for {user_id}: {e}")
+        return "Unknown"
 
-# Authentication decorator
+# Simple authentication - remove this decorator since we're using direct KPA API access
 def require_api_key(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        auth_header = request.headers.get('Authorization', '')
-        
-        if not auth_header.startswith('Bearer '):
-            return jsonify({"error": "Authorization header must start with 'Bearer '"}), 401
-        
-        api_key = auth_header.replace('Bearer ', '')
-        
-        if api_key not in Config.API_KEYS:
-            return jsonify({"error": "Invalid API key"}), 401
-        
-        if not Config.API_KEYS[api_key]["active"]:
-            return jsonify({"error": "API key is inactive"}), 401
-        
-        g.api_key_info = Config.API_KEYS[api_key]
+        # No authentication required for local API server
         return f(*args, **kwargs)
     
     return decorated_function
@@ -361,7 +296,18 @@ def init_test_database():
         )
     ''')
     
-    # Create raffle_winners table
+    # Create employee name mapping table (code → name resolution)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS employee_name_cache (
+            employee_code TEXT PRIMARY KEY,  -- MVN00245, etc.
+            employee_name TEXT NOT NULL,     -- Real name like "John Smith"
+            kpa_user_id TEXT,               -- 664fb5de8c63e90b736e22b3
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            source TEXT DEFAULT 'kpa_lookup'  -- How we got this name
+        )
+    ''')
+    
+    # Create raffle_winners table  
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS raffle_winners (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -411,89 +357,31 @@ def health_check():
     except Exception as e:
         logger.error(f"Database connection failed: {str(e)}")
         database_status = f"error: {str(e)}"
-    
-    # Test OKTA authentication
-    okta_status = "unknown"
-    okta_method = "none"
-    okta_domain = os.getenv('OKTA_DOMAIN')
-    okta_username = os.getenv('OKTA_USERNAME')
-    okta_client_id = os.getenv('OKTA_CLIENT_ID')
-    
-    if okta_domain and okta_domain != 'your-company.okta.com':
-        try:
-            okta_token = get_okta_token()
-            if okta_token:
-                if okta_username:
-                    okta_status = "connected_user_credentials"
-                    okta_method = f"user: {okta_username}"
-                elif okta_client_id:
-                    okta_status = "connected_client_credentials"  
-                    okta_method = f"client: {okta_client_id}"
-                else:
-                    okta_status = "connected_unknown_method"
-            else:
-                if okta_username:
-                    okta_status = "user_authentication_failed"
-                    okta_method = f"user: {okta_username}"
-                else:
-                    okta_status = "client_authentication_failed"
-        except Exception as e:
-            okta_status = f"error: {str(e)}"
-    else:
-        okta_status = "not_configured"
-    
-    # Test KPA session authentication  
-    kpa_session_cookie = os.getenv('KPA_SESSION_COOKIE')
-    kpa_csrf_token = os.getenv('KPA_CSRF_TOKEN')
-    session_auth_status = "not_configured"
-    
-    if kpa_session_cookie and kpa_csrf_token:
-        session_auth_status = "configured"
-        if len(kpa_session_cookie) > 20 and len(kpa_csrf_token) > 10:
-            session_auth_status = "session_available"
-    
-    # Test KPA API connection (with session authentication)  
+
+    # Test KPA API connection using direct token
     kpa_status = "unknown"
-    if session_auth_status == "session_available":
-        # Try multiple potential endpoints to find what works
-        test_endpoints = ['/api/health', '/health', '/v1/health', '/api/v1/health', '/status']
-        for endpoint in test_endpoints:
-            result, status_code = make_kpa_request('GET', endpoint)
+    if Config.KPA_API_TOKEN and Config.KPA_API_TOKEN != 'your-token-here':
+        try:
+            # Test a simple KPA API call
+            result, status_code = make_kpa_request('POST', 'responses.list', json={
+                'form_id': 289228,  # Use integer, not string
+                'limit': 1,
+                'latest': True,
+                'pretty': True
+            })
             if status_code == 200:
-                kpa_status = f"connected_session (using {endpoint})"
-                break
+                kpa_status = "connected"
             elif status_code == 429:
                 kpa_status = "rate_limited"
-                break
-            elif status_code == 401 or status_code == 403:
-                kpa_status = "session_expired"
-                break
-        else:
-            # If no endpoint worked, show the last error
-            kpa_status = f"error: {result.get('message', 'unknown error')} (status: {status_code})"
-    elif okta_status.startswith("connected"):
-        result, status_code = make_kpa_request('GET', '/health')
-        if status_code == 200:
-            kpa_status = "connected"
-        elif status_code == 429:
-            kpa_status = "rate_limited"
-        elif status_code == 401:
-            kpa_status = "okta_authentication_failed"
-        else:
-            kpa_status = f"error: {result.get('message', 'unknown error')}"
-    elif okta_status == "not_configured":
-        # Fallback to direct token if OKTA not configured
-        if Config.KPA_API_TOKEN:
-            result, status_code = make_kpa_request('GET', '/health')
-            if status_code == 200:
-                kpa_status = "connected_direct_token"
+            elif status_code == 401:
+                kpa_status = "authentication_failed"
             else:
                 kpa_status = f"error: {result.get('message', 'unknown error')}"
-        else:
-            kpa_status = "no_authentication_configured"
+        except Exception as e:
+            kpa_status = f"error: {str(e)}"
     else:
-        kpa_status = f"okta_issue: {okta_status}"
-    
+        kpa_status = "no_token_configured"
+
     # Check current rate limit status
     allowed, wait_time = check_rate_limit()
     rate_limit_status = {
@@ -502,26 +390,17 @@ def health_check():
         "requests_in_window": len(rate_limit_state['requests']),
         "limit_per_minute": Config.KPA_RATE_LIMIT_PER_MINUTE
     }
-    
+
     overall_status = "healthy"
-    if database_status != "connected" or kpa_status not in ["connected", "connected_direct_token", "connected_session", "rate_limited"]:
+    if database_status != "connected" or kpa_status not in ["connected", "rate_limited"]:
         overall_status = "degraded"
-    
+
     return jsonify({
         "status": overall_status,
         "version": "1.0.0",
         "timestamp": datetime.now().isoformat(),
         "services": {
             "database": database_status,
-            "okta_sso": {
-                "status": okta_status,
-                "method": okta_method
-            },
-            "kpa_session": {
-                "status": session_auth_status,
-                "has_cookie": bool(kpa_session_cookie),
-                "has_csrf_token": bool(kpa_csrf_token)
-            },
             "kpa_api": kpa_status,
             "rate_limiting": rate_limit_status
         }
@@ -647,7 +526,7 @@ def get_form_submissions():
     """
     try:
         # Parse query parameters - default to Great Save Raffle form
-        form_id = request.args.get('form_id', '289228')  # Great Save Raffle form ID
+        form_id = int(request.args.get('form_id', 289228))  # Great Save Raffle form ID as integer
         date_from = request.args.get('date_from')
         date_to = request.args.get('date_to')
         limit = min(int(request.args.get('limit', 100)), 500)  # Max 500 for performance
@@ -655,15 +534,21 @@ def get_form_submissions():
         
         # Build KPA API request payload for responses.list
         request_payload = {
-            'form_id': form_id,
+            'form_id': form_id,  # Must be integer, not string
             'limit': limit,
-            'offset': offset
+            'latest': True,  # Include actual response data
+            'pretty': True   # Include whitespace for readability
         }
         
+        # Add page parameter (KPA uses page, not offset)
+        if offset > 0:
+            page = (offset // limit) + 1
+            request_payload['page'] = page
+        
         if date_from:
-            request_payload['date_from'] = date_from
+            request_payload['after'] = date_from  # Use 'after' parameter for KPA API
         if date_to:
-            request_payload['date_to'] = date_to
+            request_payload['before'] = date_to   # Use 'before' parameter for KPA API
             
         # Make request to KPA responses.list endpoint
         result, status_code = make_kpa_request('POST', 'responses.list', json=request_payload)
@@ -679,30 +564,103 @@ def get_form_submissions():
         # Process and format Great Save Raffle form submissions
         formatted_submissions = []
         
-        for submission in result.get('responses', []):
-            # Extract key information from form submission
-            formatted_submission = {
-                'response_id': submission.get('response_id'),
-                'form_id': submission.get('form_id'),
-                'employee_id': submission.get('employee_id'),
-                'submission_date': submission.get('date_created'),
-                'employee': {
-                    'full_name': submission.get('employee_name'),
-                    'email': submission.get('employee_email'),
-                    'employee_id': submission.get('employee_id')
-                },
-                'submission_data': submission.get('submission_data', {}),
-                'raw_response': submission  # Include full response for debugging
-            }
-            formatted_submissions.append(formatted_submission)
+        for response in result.get('responses', []):
+            # Get detailed response information using responses.info
+            response_id = response.get('id')
+            if response_id:
+                detail_result, detail_status = make_kpa_request('POST', 'responses.info', json={
+                    'response_id': response_id
+                })
+                
+                if detail_status == 200 and detail_result.get('ok'):
+                    response_data = detail_result.get('response', {})
+                    latest = response_data.get('latest', {})
+                    responses_data = latest.get('responses', {})
+                    
+                    # Map KPA form fields to our format based on actual form structure
+                    # Field mappings discovered from form analysis:
+                    # a4bcktf70id45ylq = "Name of employee that earned the Great Save Raffle ticket?" (user ID)
+                    # km7d8el3bnzsjc3n = Observer name (person filling out form)
+                    # bcnz1j0t5w31wt88 = Employee ID/Number
+                    # qfugnl8mu4zh7agg = Prize level selection
+                    # qkx2vzdeheydfssj = Department/Location code
+                    # r69hud60slskiz35 = Description/reason
+                    
+                    nominated_employee_id = responses_data.get('a4bcktf70id45ylq', {}).get('value', {}).get('values', [''])[0] if responses_data.get('a4bcktf70id45ylq', {}).get('value', {}).get('values') else ''
+                    observer_name = responses_data.get('km7d8el3bnzsjc3n', {}).get('value', {}).get('text', 'Unknown')
+                    employee_id = responses_data.get('bcnz1j0t5w31wt88', {}).get('value', {}).get('text', '')
+                    prize_level = responses_data.get('qfugnl8mu4zh7agg', {}).get('value', {}).get('values', [''])[0] if responses_data.get('qfugnl8mu4zh7agg', {}).get('value', {}).get('values') else ''
+                    department_code = responses_data.get('qkx2vzdeheydfssj', {}).get('value', {}).get('values', [''])[0] if responses_data.get('qkx2vzdeheydfssj', {}).get('value', {}).get('values') else ''
+                    description = responses_data.get('r69hud60slskiz35', {}).get('value', {}).get('text', '')
+                    
+                    # Extract photo attachments from form fields
+                    # Photo fields: 02rih1l2u938808b and riggypq53qwmtqah contain attachments
+                    photo_attachments = []
+                    for field_id in ['02rih1l2u938808b', 'riggypq53qwmtqah']:
+                        field_data = responses_data.get(field_id, {}).get('value', {})
+                        attachments = field_data.get('attachments', [])
+                        for attachment in attachments:
+                            if attachment.get('key'):
+                                # Create proxied photo URL through our Flask server
+                                photo_url = f"http://localhost:5001/api/v1/photos/proxy?key={attachment['key']}"
+                                photo_attachments.append({
+                                    'key': attachment['key'],
+                                    'url': photo_url,
+                                    'original_url': f"https://mvncorp.kpaehs.com/get-upload?key={attachment['key']}"
+                                })
+                    
+                    # Try to resolve nominated employee name from user ID
+                    nominated_employee_name = "Unknown"
+                    if nominated_employee_id:
+                        try:
+                            # Look up employee details using KPA web interface autocomplete
+                            employee_name = lookup_employee_name(nominated_employee_id)
+                            if employee_name and employee_name != "Unknown" and "Does Not Qualify" not in employee_name:
+                                nominated_employee_name = employee_name
+                            elif employee_id and employee_id != "Unknown":
+                                # Use the employee ID to create a readable name
+                                if " – " in employee_id:  # Format like "508-L1 – L2"
+                                    emp_code = employee_id.split(" – ")[0]
+                                    nominated_employee_name = f"Employee {emp_code}"
+                                else:
+                                    nominated_employee_name = f"Employee {employee_id}"
+                            else:
+                                # Fallback to shortened user ID
+                                nominated_employee_name = f"Employee {nominated_employee_id[:8]}..."
+                        except Exception as e:
+                            logger.warning(f"Failed to lookup employee {nominated_employee_id}: {e}")
+                            if employee_id and employee_id != "Unknown":
+                                nominated_employee_name = f"Employee {employee_id}"
+                            else:
+                                nominated_employee_name = f"Employee {nominated_employee_id[:8]}..."
+                    
+                    formatted_submission = {
+                        'response_id': response_id,
+                        'form_id': form_id,
+                        'submission_date': response.get('created'),
+                        'employee_name': nominated_employee_name,  # The person who earned the ticket
+                        'observer_name': observer_name,  # The person who filled out the form
+                        'employee_id': employee_id,
+                        'nominated_employee_id': nominated_employee_id,  # Raw user ID
+                        'email': '',  # Not available in this form
+                        'department': department_code,
+                        'location': department_code,  # Using department code as location
+                        'prize_level': prize_level,
+                        'description': description,
+                        'photos': photo_attachments,  # Add photo URLs for automatic retrieval
+                        'photo_url': photo_attachments[0]['url'] if photo_attachments else None,  # Primary photo for easy access
+                        'raw_response': response_data  # Include full response for debugging
+                    }
+                    formatted_submissions.append(formatted_submission)
         
         return jsonify({
             "submissions": formatted_submissions,
-            "total": result.get('total', len(formatted_submissions)),
+            "total": result.get('paging', {}).get('total', len(formatted_submissions)),
             "count": len(formatted_submissions),
             "limit": limit,
             "offset": offset,
             "form_id": form_id,
+            "description": result.get('description', ''),
             "ok": True
         })
         
@@ -924,6 +882,110 @@ def get_employee_photo(employee_id):
         
     except Exception as e:
         logger.error(f"Error in get_employee_photo: {str(e)}")
+        return jsonify({
+            "error": "internal_error",
+            "message": f"Internal server error: {str(e)}",
+            "ok": False
+        }), 500
+
+@app.route('/api/v1/photos/proxy', methods=['GET'])
+@require_api_key
+def proxy_kpa_photo():
+    """
+    Proxy KPA photos using the web interface with session authentication
+    Since the KPA API doesn't have upload endpoints, we use the web interface
+    """
+    try:
+        photo_key = request.args.get('key')
+        if not photo_key:
+            return jsonify({
+                "error": "missing_parameter",
+                "message": "Photo key parameter is required",
+                "ok": False
+            }), 400
+        
+        # Construct the KPA photo URL (web interface)
+        kpa_photo_url = f"https://mvncorp.kpaehs.com/get-upload?key={photo_key}"
+        
+        # Get session info from environment for authenticated requests
+        session_cookie = os.getenv('KPA_SESSION_COOKIE', '')
+        csrf_token = os.getenv('KPA_CSRF_TOKEN', '')
+        
+        if not session_cookie:
+            return jsonify({
+                "error": "no_session",
+                "message": "KPA session cookie not configured",
+                "ok": False
+            }), 500
+        
+        headers = {
+            'Cookie': session_cookie,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',
+            'Referer': 'https://mvncorp.kpaehs.com/forms/analyze/289228',
+            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Sec-Fetch-Dest': 'image',
+            'Sec-Fetch-Mode': 'no-cors',
+            'Sec-Fetch-Site': 'same-origin'
+        }
+        
+        if csrf_token:
+            headers['isc-csrf-token'] = csrf_token
+        
+        # Fetch the photo from KPA web interface
+        import requests as photo_requests
+        try:
+            logger.info(f"Fetching photo from KPA: {photo_key}")
+            response = photo_requests.get(kpa_photo_url, headers=headers, timeout=30, stream=True)
+            
+            if response.status_code == 200:
+                logger.info(f"Successfully fetched photo for key: {photo_key}")
+                
+                # Determine content type
+                content_type = response.headers.get('content-type', 'image/jpeg')
+                
+                # Stream the photo data back to the client
+                def generate():
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            yield chunk
+                
+                return Response(
+                    generate(),
+                    mimetype=content_type,
+                    headers={
+                        'Cache-Control': 'public, max-age=3600',  # Cache for 1 hour
+                        'Content-Disposition': f'inline; filename="photo_{photo_key[-20:]}.jpg"'
+                    }
+                )
+            
+            else:
+                logger.warning(f"Failed to fetch photo {photo_key}: HTTP {response.status_code}")
+                return jsonify({
+                    "error": "photo_fetch_failed",
+                    "message": f"Failed to fetch photo from KPA (status: {response.status_code})",
+                    "status_code": response.status_code,
+                    "ok": False
+                }), response.status_code
+                
+        except photo_requests.exceptions.Timeout:
+            logger.error(f"Timeout fetching photo: {photo_key}")
+            return jsonify({
+                "error": "photo_timeout",
+                "message": "Timeout while fetching photo from KPA",
+                "ok": False
+            }), 408
+            
+        except photo_requests.exceptions.RequestException as e:
+            logger.error(f"Request error fetching photo {photo_key}: {e}")
+            return jsonify({
+                "error": "photo_request_failed",
+                "message": f"Failed to request photo from KPA: {str(e)}",
+                "ok": False
+            }), 502
+        
+    except Exception as e:
+        logger.error(f"Error in proxy_kpa_photo: {str(e)}")
         return jsonify({
             "error": "internal_error",
             "message": f"Internal server error: {str(e)}",
