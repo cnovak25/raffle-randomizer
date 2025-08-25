@@ -130,6 +130,53 @@ except Exception as e:
     st.error(f"❌ Token access error: {str(e)}")
     KPA_TOKEN = None
 
+def test_kpa_integration() -> dict:
+    """Test KPA API integration and return status for debugging/monitoring"""
+    status = {
+        "token_available": bool(KPA_TOKEN),
+        "token_length": len(KPA_TOKEN) if KPA_TOKEN else 0,
+        "api_base": API_BASE,
+        "users_info_available": False,
+        "users_list_available": False,
+        "error_messages": []
+    }
+    
+    if not KPA_TOKEN:
+        status["error_messages"].append("No KPA token configured")
+        return status
+    
+    # Test users.info endpoint
+    try:
+        test_data = {"token": KPA_TOKEN, "user_id": "test_user"}
+        resp = requests.post(f"{API_BASE}/users.info", json=test_data, timeout=5)
+        if resp.status_code == 200:
+            result = resp.json()
+            if "ok" in result:  # Valid KPA response structure
+                status["users_info_available"] = True
+            else:
+                status["error_messages"].append(f"users.info: Invalid response structure")
+        else:
+            status["error_messages"].append(f"users.info: HTTP {resp.status_code}")
+    except Exception as e:
+        status["error_messages"].append(f"users.info: {str(e)}")
+    
+    # Test users.list endpoint  
+    try:
+        test_data = {"token": KPA_TOKEN, "query": "test", "limit": 1}
+        resp = requests.post(f"{API_BASE}/users.list", json=test_data, timeout=5)
+        if resp.status_code == 200:
+            result = resp.json()
+            if "ok" in result:  # Valid KPA response structure
+                status["users_list_available"] = True
+            else:
+                status["error_messages"].append(f"users.list: Invalid response structure")
+        else:
+            status["error_messages"].append(f"users.list: HTTP {resp.status_code}")
+    except Exception as e:
+        status["error_messages"].append(f"users.list: {str(e)}")
+    
+    return status
+
 def extract_user_id(employee_name: str, photo_field: str) -> Optional[str]:
     """Extract user ID from name or photo field for KPA API lookup"""
     if not employee_name and not photo_field:
@@ -996,6 +1043,37 @@ if 'winner_announced' not in st.session_state:
 # Header with MVN logos
 display_header_with_logo()
 st.markdown('<p style="text-align: center; color: #666; font-family: Poppins; margin-bottom: 2rem;">📁 Upload CSV • Pick Winner • Create Winner Card • Download PNG</p>', unsafe_allow_html=True)
+
+# KPA Integration Status (for development/debugging)
+with st.expander("🔧 KPA Integration Status", expanded=False):
+    kpa_status = test_kpa_integration()
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if kpa_status["token_available"]:
+            st.success(f"✅ Token Available ({kpa_status['token_length']} chars)")
+        else:
+            st.error("❌ No KPA Token")
+    
+    with col2:
+        if kpa_status["users_info_available"]:
+            st.success("✅ users.info endpoint")
+        else:
+            st.error("❌ users.info unavailable")
+    
+    with col3:
+        if kpa_status["users_list_available"]:
+            st.success("✅ users.list endpoint")
+        else:
+            st.error("❌ users.list unavailable")
+    
+    if kpa_status["error_messages"]:
+        st.warning("⚠️ Issues found:")
+        for error in kpa_status["error_messages"]:
+            st.write(f"• {error}")
+    
+    st.info(f"🌐 API Base: {kpa_status['api_base']}")
 
 # Show confetti if in celebration mode
 if st.session_state.celebration_mode:
