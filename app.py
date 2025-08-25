@@ -162,8 +162,18 @@ def fetch_photo_bytes(photo_field: str) -> Optional[bytes]:
             resp = requests.post(f"{API_BASE}/files.get_url", json=data, timeout=10)
             if resp.status_code == 200:
                 url_data = resp.json()
-                if "url" in url_data:
-                    img_resp = requests.get(url_data["url"], timeout=10)
+                st.write(f"🔍 KPA API Response: {url_data}")  # Debug the actual response
+                
+                # Try different possible field names for the download URL
+                download_url = None
+                for url_field in ["url", "download_url", "file_url", "link", "downloadUrl", "fileUrl"]:
+                    if url_field in url_data:
+                        download_url = url_data[url_field]
+                        st.info(f"✅ Found download URL in field: {url_field}")
+                        break
+                
+                if download_url:
+                    img_resp = requests.get(download_url, timeout=10)
                     if img_resp.status_code == 200:
                         st.success("📸 Photo loaded successfully!")
                         return img_resp.content
@@ -171,6 +181,7 @@ def fetch_photo_bytes(photo_field: str) -> Optional[bytes]:
                         st.warning(f"⚠️ Photo download failed: HTTP {img_resp.status_code}")
                 else:
                     st.warning("⚠️ KPA API response missing download URL")
+                    st.write(f"Available fields: {list(url_data.keys())}")
             else:
                 st.warning(f"⚠️ KPA API error: HTTP {resp.status_code}")
         except Exception as e:
@@ -191,11 +202,23 @@ def fetch_photo_bytes(photo_field: str) -> Optional[bytes]:
             resp = requests.post(f"{API_BASE}/files.get_url", json=data, timeout=10)
             if resp.status_code == 200:
                 url_data = resp.json()
-                if "url" in url_data:
-                    img_resp = requests.get(url_data["url"], timeout=10)
+                st.write(f"🔍 KPA API Response (local fallback): {url_data}")  # Debug the actual response
+                
+                # Try different possible field names for the download URL
+                download_url = None
+                for url_field in ["url", "download_url", "file_url", "link", "downloadUrl", "fileUrl"]:
+                    if url_field in url_data:
+                        download_url = url_data[url_field]
+                        st.info(f"✅ Found download URL in field: {url_field}")
+                        break
+                
+                if download_url:
+                    img_resp = requests.get(download_url, timeout=10)
                     if img_resp.status_code == 200:
                         st.success("📸 Photo loaded via KPA API!")
                         return img_resp.content
+                else:
+                    st.write(f"Available fields: {list(url_data.keys())}")
         except Exception as e:
             st.error(f"❌ Photo API error: {str(e)}")
     
