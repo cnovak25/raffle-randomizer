@@ -6,6 +6,9 @@ from datetime import datetime
 import base64
 from typing import Optional
 
+# FORCE STREAMLIT CLOUD REFRESH - VERSION 2.0 PHOTO FIX
+st.write("🔄 App Version 2.0 - Photo Fix Applied")
+
 # Configure page for mobile-first responsive design
 st.set_page_config(
     page_title="🎉 MVN Great Save Raffle 🎉",
