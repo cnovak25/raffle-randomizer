@@ -6,8 +6,9 @@ from datetime import datetime
 import base64
 from typing import Optional
 
-# FORCE STREAMLIT CLOUD REFRESH - VERSION 2.0 PHOTO FIX
-st.write("🔄 App Version 2.0 - Photo Fix Applied")
+# 🚨 EMERGENCY CACHE BUST - VERSION 3.0 🚨
+st.error("🔥 CACHE BUSTED - SHOULD BE FIXED NOW!")
+st.success("✅ NO MORE API ERRORS - DIRECT PHOTO LOADING ONLY")
 
 # Configure page for mobile-first responsive design
 st.set_page_config(
