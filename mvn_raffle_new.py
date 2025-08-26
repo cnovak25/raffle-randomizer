@@ -176,6 +176,21 @@ def main():
         st.subheader("👀 Data Preview")
         st.dataframe(df.head())
         
+        # Show what the current mappings are
+        st.subheader("✅ Current Column Mappings")
+        st.write(f"- **Name:** {name_col}")
+        st.write(f"- **Location:** {location_col}")  
+        st.write(f"- **Level:** {level_col}")
+        st.write(f"- **Photo:** {photo_col}")
+        
+        # Show a sample row to verify
+        st.subheader("🔍 Sample Data Row")
+        sample_row = df.iloc[0]
+        st.write(f"- Sample Name: '{sample_row.get(name_col, 'NOT FOUND')}'")
+        st.write(f"- Sample Location: '{sample_row.get(location_col, 'NOT FOUND')}'")
+        st.write(f"- Sample Level: '{sample_row.get(level_col, 'NOT FOUND')}'")
+        st.write(f"- Sample Photo: '{str(sample_row.get(photo_col, 'NOT FOUND'))[:100]}...'")
+        
         # Winner selection
         st.subheader("🎰 Pick Your Winner!")
         
