@@ -173,9 +173,41 @@ def main():
         df = pd.read_csv(uploaded_file)
         st.success(f"✅ Successfully loaded {len(df)} participants!")
         
+        # Show actual column names for debugging
+        st.subheader("🔍 Column Names in Your CSV")
+        st.write("**Available columns:**", list(df.columns))
+        
+        # Let user map columns
+        st.subheader("🔧 Column Mapping")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            name_col = st.selectbox("👤 Name Column", df.columns, index=0)
+        with col2:
+            location_col = st.selectbox("🏢 Location Column", df.columns, index=1 if len(df.columns) > 1 else 0)
+        with col3:
+            level_col = st.selectbox("🎫 Level Column", df.columns, index=2 if len(df.columns) > 2 else 0)
+            
+        photo_col = st.selectbox("📸 Photo Column", df.columns, index=len(df.columns)-1)
+        
         # Show data preview
         st.subheader("👀 Data Preview")
         st.dataframe(df.head())
+        
+        # Show what the current mappings are
+        st.subheader("✅ Current Column Mappings")
+        st.write(f"- **Name:** {name_col}")
+        st.write(f"- **Location:** {location_col}")  
+        st.write(f"- **Level:** {level_col}")
+        st.write(f"- **Photo:** {photo_col}")
+        
+        # Show a sample row to verify
+        st.subheader("🔍 Sample Data Row")
+        sample_row = df.iloc[0]
+        st.write(f"- Sample Name: '{sample_row.get(name_col, 'NOT FOUND')}'")
+        st.write(f"- Sample Location: '{sample_row.get(location_col, 'NOT FOUND')}'")
+        st.write(f"- Sample Level: '{sample_row.get(level_col, 'NOT FOUND')}'")
+        st.write(f"- Sample Photo: '{str(sample_row.get(photo_col, 'NOT FOUND'))[:100]}...'")
         
         # Winner selection
         st.subheader("🎰 Pick Your Winner!")
@@ -184,12 +216,20 @@ def main():
             winner_idx = random.randint(0, len(df) - 1)
             winner = df.iloc[winner_idx]
             
-            name = str(winner.get(COL_NAME, "")).strip()
-            location = str(winner.get(COL_LOCATION, "")).strip() 
-            level = str(winner.get(COL_LEVEL, "")).strip()
-            photo_field = str(winner.get(COL_PHOTO, "")).strip()
+            # Use the selected column mappings
+            name = str(winner.get(name_col, "")).strip()
+            location = str(winner.get(location_col, "")).strip() 
+            level = str(winner.get(level_col, "")).strip()
+            photo_field = str(winner.get(photo_col, "")).strip()
             
             st.success(f"🏆 WINNER: {name}! 🏆")
+            
+            # Debug what we extracted
+            st.write(f"**Debug Info:**")
+            st.write(f"- Name from '{name_col}': '{name}'")
+            st.write(f"- Location from '{location_col}': '{location}'")
+            st.write(f"- Level from '{level_col}': '{level}'")
+            st.write(f"- Photo from '{photo_col}': '{photo_field[:100] if photo_field else 'EMPTY'}...'")
             
             # Display winner info
             col1, col2, col3 = st.columns(3)
