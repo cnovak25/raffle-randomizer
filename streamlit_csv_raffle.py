@@ -39,23 +39,33 @@ KPA_TOKEN = os.getenv("KPA_TOKEN") or os.getenv("KPA_API_TOKEN")
 
 # Simple photo loading function - NO API CALLS
 def fetch_photo_bytes(photo_field: str) -> Optional[bytes]:
-    """Fetch photo directly from URL - SIMPLIFIED VERSION"""
+    """Fetch photo directly from URL - SIMPLE AND RELIABLE"""
     if not photo_field or not photo_field.startswith("http"):
         st.warning("⚠️ No valid photo URL provided")
         return None
     
     try:
-        st.info(f"🔗 Loading photo from: {photo_field[:60]}...")
+        st.info(f"🔗 Loading photo from: {photo_field[:80]}...")
         response = requests.get(photo_field, timeout=15)
         if response.status_code == 200:
             photo_data = response.content
             st.success(f"📸 Photo loaded! Size: {len(photo_data):,} bytes")
             
-            # Quick format check
-            if photo_data.startswith(b'\xff\xd8') or photo_data.startswith(b'\x89PNG'):
-                st.info("🖼️ Valid image format detected")
+            # Enhanced format detection
+            if photo_data.startswith(b'\xff\xd8'):
+                st.info("🖼️ JPEG format detected")
+            elif photo_data.startswith(b'\x89PNG'):
+                st.info("🖼️ PNG format detected")
+            elif photo_data.startswith(b'GIF8'):
+                st.info("🖼️ GIF format detected")
+            elif photo_data.startswith(b'RIFF') and b'WEBP' in photo_data[:20]:
+                st.info("🖼️ WebP format detected")
             else:
-                st.warning("⚠️ Unexpected image format - might not display properly")
+                st.warning(f"⚠️ Unknown image format. First 20 bytes: {photo_data[:20]}")
+                # Try to handle HTML responses (common issue)
+                if b'<html' in photo_data[:100].lower() or b'<!doctype' in photo_data[:100].lower():
+                    st.error("❌ Received HTML instead of image - URL might be redirecting")
+                    return None
                 
             return photo_data
         else:
@@ -115,31 +125,47 @@ def draw_winner_card(name: str, location: str, level: str, photo_bytes: Optional
     inner_box = (box[0]+4, box[1]+4, box[2]-4, box[3]-4)
     d.rounded_rectangle(inner_box, radius=12, outline=(90, 90, 90), width=2)
     
-    # FIXED PHOTO PROCESSING
+    # PHOTO PROCESSING - ENHANCED ERROR HANDLING
     if photo_bytes:
         try:
-            st.write(f"DEBUG: Processing photo, size: {len(photo_bytes)} bytes")
-            p = Image.open(io.BytesIO(photo_bytes)).convert("RGB")
-            st.write(f"DEBUG: Image loaded, dimensions: {p.size}")
+            st.write(f"🖼️ Processing photo: {len(photo_bytes)} bytes")
             
-            # Calculate scaling to fit the box
-            bw, bh = inner_box[2] - inner_box[0], inner_box[3] - inner_box[1]
-            scale = min(bw / p.width, bh / p.height)  # Use min to fit inside
-            new_size = (int(p.width * scale), int(p.height * scale))
-            p = p.resize(new_size, Image.Resampling.LANCZOS)
-            
-            # Center the image in the box
-            x_offset = (bw - new_size[0]) // 2
-            y_offset = (bh - new_size[1]) // 2
-            img.paste(p, (inner_box[0] + x_offset, inner_box[1] + y_offset))
-            st.success("✅ Photo rendered successfully in card!")
-            
+            # Try to detect if it's actually an image
+            if photo_bytes.startswith(b'<html') or photo_bytes.startswith(b'<!doctype'):
+                st.error("❌ Received HTML page instead of image")
+                d.text((inner_box[0] + 20, inner_box[1] + 20), "📷 HTML received instead of image", fill=(200, 200, 200), font=info_font)
+            else:
+                # Try opening with PIL
+                try:
+                    p = Image.open(io.BytesIO(photo_bytes))
+                    p = p.convert("RGB")  # Ensure RGB format
+                    st.write(f"✅ Image loaded: {p.size[0]}x{p.size[1]} pixels, mode: {p.mode}")
+                    
+                    # Calculate scaling to fit the box
+                    bw, bh = inner_box[2] - inner_box[0], inner_box[3] - inner_box[1]
+                    scale = min(bw / p.width, bh / p.height)
+                    new_size = (int(p.width * scale), int(p.height * scale))
+                    p = p.resize(new_size, Image.Resampling.LANCZOS)
+                    
+                    # Center the image in the box
+                    x_offset = (bw - new_size[0]) // 2
+                    y_offset = (bh - new_size[1]) // 2
+                    img.paste(p, (inner_box[0] + x_offset, inner_box[1] + y_offset))
+                    st.success("✅ Photo successfully rendered in winner card!")
+                    
+                except Exception as pil_error:
+                    st.error(f"❌ PIL processing failed: {pil_error}")
+                    # Show raw data for debugging
+                    st.write(f"First 50 bytes: {photo_bytes[:50]}")
+                    st.write(f"Last 50 bytes: {photo_bytes[-50:]}")
+                    d.text((inner_box[0] + 20, inner_box[1] + 20), f"📷 Image processing error", fill=(200, 200, 200), font=info_font)
+                
         except Exception as e:
             st.error(f"❌ Photo processing failed: {e}")
             d.text((inner_box[0] + 20, inner_box[1] + 20), f"📷 Photo error: {str(e)}", fill=(200, 200, 200), font=info_font)
     else:
-        st.warning("⚠️ No photo bytes provided to card")
-        d.text((inner_box[0] + 20, inner_box[1] + 20), "📷 Photo unavailable", fill=(200, 200, 200), font=info_font)
+        st.warning("⚠️ No photo provided for winner card")
+        d.text((inner_box[0] + 20, inner_box[1] + 20), "📷 No photo available", fill=(200, 200, 200), font=info_font)
 
     # Winner info
     name = (name or "").strip() or "(name missing)"
