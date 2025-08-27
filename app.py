@@ -14,33 +14,50 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-def fetch_photo_via_proxy(photo_url: str, proxy_base: str = "http://localhost:8000") -> Optional[bytes]:
-    """Fetch photo via KPA proxy server"""
+def fetch_photo_directly(photo_url: str) -> Optional[bytes]:
+    """Fetch photo directly from KPA with session authentication"""
     if not photo_url or "get-upload" not in photo_url:
         return None
     
     try:
-        # Extract the 'key' parameter from the KPA URL
+        # Extract employee ID or key from URL for direct KPA photo access
         if "key=" in photo_url:
             key = photo_url.split("key=")[1].split("&")[0]
-            proxy_url = f"{proxy_base}/kpa-photo?key={key}"
+            
+            # Use the KPA session cookie from environment
+            kpa_session = os.environ.get('KPA_SESSION_COOKIE', '6Pphk3dbK4Y-mvncorp')
+            
+            # Try direct photo URL pattern
+            emp_id = key  # Assuming key is employee ID
+            direct_photo_url = f"https://mvnconnect.kpaonline.com/employeephotos/{emp_id}.jpg"
+            
+            headers = {
+                'Cookie': f'ASP.NET_SessionId={kpa_session}',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Referer': 'https://mvnconnect.kpaonline.com/',
+                'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
+            }
             
             with st.spinner("📸 Loading winner photo..."):
-                response = requests.get(proxy_url, timeout=30)
+                response = requests.get(direct_photo_url, headers=headers, timeout=15)
                 if response.status_code == 200:
                     photo_data = response.content
                     st.success("✅ Photo loaded successfully!")
                     return photo_data
                 else:
-                    st.error(f"❌ Could not load photo (HTTP {response.status_code})")
+                    st.warning(f"📷 Photo not available (HTTP {response.status_code})")
                     return None
         else:
             st.error("❌ Invalid photo URL format")
             return None
             
     except Exception as e:
-        st.error(f"❌ Photo loading failed: {str(e)}")
+        st.error(f"❌ Error loading photo: {str(e)}")
         return None
+
+def fetch_photo_via_proxy(photo_url: str, proxy_base: str = None) -> Optional[bytes]:
+    """Legacy proxy method - fallback to direct fetch"""
+    return fetch_photo_directly(photo_url)
 
 def draw_winner_card(name: str, location: str, level: str, photo_bytes: Optional[bytes]) -> Image.Image:
     """Create winner card with proper photo rendering - LANDSCAPE with ROTATED PHOTO"""
