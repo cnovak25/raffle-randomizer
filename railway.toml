@@ -7,3 +7,11 @@ startCommand = "python start_services.py"
 [env]
 PORT = "8501"
 PROXY_PORT = "8000"
+
+[nixpacks]
+cmds = ["python start_services.py"]
+
+# Expose Streamlit port for Railway
+[[services]]
+name = "web"
+port = 8501

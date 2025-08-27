@@ -12,23 +12,31 @@ import sys
 def start_fastapi():
     """Start the FastAPI proxy server"""
     print("🚀 Starting FastAPI proxy server on port 8000...")
-    subprocess.run([
-        "python", "-m", "uvicorn", 
-        "kpa_photo_proxy_railway:app", 
-        "--host", "0.0.0.0", 
-        "--port", "8000"
-    ])
+    try:
+        subprocess.run([
+            "python", "-m", "uvicorn", 
+            "kpa_photo_proxy_railway:app", 
+            "--host", "0.0.0.0", 
+            "--port", "8000"
+        ])
+    except Exception as e:
+        print(f"❌ FastAPI failed to start: {e}")
 
 def start_streamlit():
     """Start the Streamlit app"""
-    print("🎯 Starting Streamlit app on port 8501...")
-    subprocess.run([
-        "streamlit", "run", "app.py", 
-        "--server.port", "8501",
-        "--server.address", "0.0.0.0",
-        "--server.headless", "true",
-        "--server.enableCORS", "false"
-    ])
+    # Use Railway's PORT environment variable if available
+    port = os.environ.get('PORT', '8501')
+    print(f"🎯 Starting Streamlit app on port {port}...")
+    try:
+        subprocess.run([
+            "python", "-m", "streamlit", "run", "app.py", 
+            "--server.port", port,
+            "--server.address", "0.0.0.0",
+            "--server.headless", "true",
+            "--server.enableCORS", "false"
+        ])
+    except Exception as e:
+        print(f"❌ Streamlit failed to start: {e}")
 
 def signal_handler(signum, frame):
     """Handle shutdown signals"""
