@@ -1,0 +1,9 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "python start_services.py"
+
+[env]
+PORT = "8501"
+PROXY_PORT = "8000"
