@@ -6,7 +6,23 @@ from datetime import datetime
 import base64
 from typing import Optional
 
-# BRAND NEW FILE - NO CACHE ISSUES - PHOTO FIX
+# BRAND NEW FILE - NO        # Photo option toggle with proxy server
+        photo_option = st.radio(
+            "📸 Photo Loading Options:",
+            [
+                "🚫 Skip photos (fastest)",
+                "🔗 Use KPA Proxy Server (recommended)",
+                "🔐 Try with session cookies (manual)",
+                "🌐 Try direct URLs (will fail)"
+            ]
+        )
+        
+        session_cookies = ""
+        if photo_option == "🔐 Try with session cookies (manual)":
+            st.info("💡 **How to get session cookies:**\n1. Login to KPA in another tab\n2. Open Developer Tools (F12)\n3. Go to Application/Storage → Cookies\n4. Copy the session cookie value")
+            session_cookies = st.text_input("🍪 Paste KPA session cookie:", type="password")
+        elif photo_option == "🔗 Use KPA Proxy Server (recommended)":
+            st.info("🚀 **Using FastAPI proxy server** - handles KPA authentication automatically")- PHOTO FIX
 st.success("✅ RUNNING FIXED VERSION - NO MORE API ERRORS!")
 
 # Configure page for mobile-first responsive design
@@ -38,6 +54,74 @@ COL_PHOTO = "Photo"
 KPA_TOKEN = os.getenv("KPA_TOKEN") or os.getenv("KPA_API_TOKEN")
 
 # Simple photo loading function - NO API CALLS
+def fetch_photo_via_proxy(photo_url: str, proxy_base: str = "http://localhost:8000") -> Optional[bytes]:
+    """Fetch photo via KPA proxy server"""
+    if not photo_url or "get-upload" not in photo_url:
+        st.warning("⚠️ Invalid KPA photo URL")
+        return None
+    
+    try:
+        # Extract the 'key' parameter from the KPA URL
+        if "key=" in photo_url:
+            key = photo_url.split("key=")[1].split("&")[0]
+            proxy_url = f"{proxy_base}/kpa-photo?key={key}"
+            
+            st.info(f"🔗 Loading via proxy: {proxy_url[:80]}...")
+            
+            response = requests.get(proxy_url, timeout=30)
+            if response.status_code == 200:
+                photo_data = response.content
+                cache_status = response.headers.get('X-Cache', 'UNKNOWN')
+                st.success(f"📸 Photo loaded via proxy! Size: {len(photo_data):,} bytes (Cache: {cache_status})")
+                return photo_data
+            else:
+                st.error(f"❌ Proxy server returned: HTTP {response.status_code}")
+                return None
+        else:
+            st.error("❌ Could not extract key from KPA URL")
+            return None
+            
+    except Exception as e:
+        st.error(f"❌ Proxy fetch error: {str(e)}")
+        return None
+
+def fetch_photo_with_session(photo_field: str, session_cookies: str) -> Optional[bytes]:
+    """Fetch photo using KPA session cookies"""
+    if not photo_field or not photo_field.startswith("http"):
+        st.warning("⚠️ No valid photo URL provided")
+        return None
+    
+    try:
+        st.info(f"🔗 Loading photo with session: {photo_field[:80]}...")
+        
+        # Use session cookies to authenticate
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Cookie': session_cookies
+        }
+        
+        response = requests.get(photo_field, timeout=15, headers=headers, allow_redirects=True)
+        if response.status_code == 200:
+            photo_data = response.content
+            st.success(f"📸 Photo loaded with session! Size: {len(photo_data):,} bytes")
+            
+            # Check if we got an image or HTML
+            if photo_data.startswith(b'<html') or photo_data.startswith(b'<!doctype'):
+                st.error("❌ Still receiving HTML - session may be invalid")
+                return None
+            elif photo_data.startswith(b'\xff\xd8') or photo_data.startswith(b'\x89PNG'):
+                st.success("✅ Valid image format detected with session!")
+                return photo_data
+            else:
+                st.warning(f"⚠️ Unknown format with session. First 20 bytes: {photo_data[:20]}")
+                return photo_data
+        else:
+            st.warning(f"⚠️ Photo URL failed with session: HTTP {response.status_code}")
+            return None
+    except Exception as e:
+        st.error(f"❌ Photo fetch with session error: {str(e)}")
+        return None
+
 def fetch_photo_bytes(photo_field: str) -> Optional[bytes]:
     """Fetch photo directly from URL - SIMPLE AND RELIABLE"""
     if not photo_field or not photo_field.startswith("http"):
@@ -46,10 +130,27 @@ def fetch_photo_bytes(photo_field: str) -> Optional[bytes]:
     
     try:
         st.info(f"🔗 Loading photo from: {photo_field[:80]}...")
-        response = requests.get(photo_field, timeout=15)
+        
+        # Add headers to mimic a browser request
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        
+        response = requests.get(photo_field, timeout=15, headers=headers, allow_redirects=True)
         if response.status_code == 200:
             photo_data = response.content
             st.success(f"📸 Photo loaded! Size: {len(photo_data):,} bytes")
+            
+            # Show the actual content type returned
+            content_type = response.headers.get('content-type', 'unknown')
+            st.info(f"🔍 Content-Type: {content_type}")
+            
+            # Show first 100 characters as text to see if it's HTML
+            try:
+                first_100_text = photo_data[:100].decode('utf-8', errors='ignore')
+                st.write(f"**First 100 chars as text:** {first_100_text}")
+            except:
+                st.write("**First 100 bytes:** (binary data)")
             
             # Enhanced format detection
             if photo_data.startswith(b'\xff\xd8'):
@@ -60,12 +161,12 @@ def fetch_photo_bytes(photo_field: str) -> Optional[bytes]:
                 st.info("🖼️ GIF format detected")
             elif photo_data.startswith(b'RIFF') and b'WEBP' in photo_data[:20]:
                 st.info("🖼️ WebP format detected")
+            elif photo_data.startswith(b'<html') or photo_data.startswith(b'<!doctype') or photo_data.startswith(b'<!DOCTYPE'):
+                st.error("❌ Received HTML page instead of image")
+                return None
             else:
-                st.warning(f"⚠️ Unknown image format. First 20 bytes: {photo_data[:20]}")
-                # Try to handle HTML responses (common issue)
-                if b'<html' in photo_data[:100].lower() or b'<!doctype' in photo_data[:100].lower():
-                    st.error("❌ Received HTML instead of image - URL might be redirecting")
-                    return None
+                st.warning(f"⚠️ Unknown format. First 20 bytes: {photo_data[:20]}")
+                st.write(f"Hex: {photo_data[:20].hex()}")
                 
             return photo_data
         else:
@@ -238,6 +339,21 @@ def main():
         # Winner selection
         st.subheader("🎰 Pick Your Winner!")
         
+        # Photo option toggle with new authentication approach
+        photo_option = st.radio(
+            "📸 Photo Loading Options:",
+            [
+                "🚫 Skip photos (fastest)",
+                "🔐 Try with session cookies (paste your KPA session)",
+                "🌐 Try direct URLs (may fail)"
+            ]
+        )
+        
+        session_cookies = ""
+        if photo_option == "🔐 Try with session cookies (paste your KPA session)":
+            st.info("� **How to get session cookies:**\n1. Login to KPA in another tab\n2. Open Developer Tools (F12)\n3. Go to Application/Storage → Cookies\n4. Copy the session cookie value")
+            session_cookies = st.text_input("🍪 Paste KPA session cookie:", type="password")
+        
         if st.button("🎲 Random Selection"):
             winner_idx = random.randint(0, len(df) - 1)
             winner = df.iloc[winner_idx]
@@ -268,9 +384,23 @@ def main():
                 
             st.info(f"📊 Selected from row {winner_idx + 1} of {len(df)} participants")
             
-            # Fetch photo (SIMPLIFIED - NO API CALLS)
-            with st.spinner("🖼️ Fetching winner photo..."):
-                photo_bytes = fetch_photo_bytes(photo_field)
+            # Fetch photo based on selected option
+            photo_bytes = None
+            if photo_option == "🚫 Skip photos (fastest)":
+                st.info("📸 Photo loading skipped (disabled)")
+            elif photo_option == "🔗 Use KPA Proxy Server (recommended)" and photo_field:
+                with st.spinner("🖼️ Fetching winner photo via proxy server..."):
+                    photo_bytes = fetch_photo_via_proxy(photo_field)
+            elif photo_option == "🌐 Try direct URLs (will fail)" and photo_field:
+                with st.spinner("🖼️ Fetching winner photo (direct URL)..."):
+                    photo_bytes = fetch_photo_bytes(photo_field)
+            elif photo_option == "🔐 Try with session cookies (manual)" and photo_field and session_cookies:
+                with st.spinner("🖼️ Fetching winner photo (with session)..."):
+                    photo_bytes = fetch_photo_with_session(photo_field, session_cookies)
+            elif photo_field:
+                st.warning("📸 Photo URL provided but loading method not configured")
+            else:
+                st.warning("📸 No photo URL provided")
                 
             # Generate winner card
             with st.spinner("🎨 Creating winner card..."):
