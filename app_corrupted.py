@@ -1,7 +1,40 @@
 import os, io, time, random, requests, pandas as pd, streamlit as st
 from urllib.parse import urlparse, parse_qs, unquote
 from PIL import Image, ImageDraw, ImageFont
-import plotly.graph_objects as go
+import     # Title with MVN logos on each side - better alignment
+    col1, col2, col3 = st.columns([1, 3, 1])
+    
+    with col1:
+        st.markdown('<div style="display: flex; justify-content: center; align-items: center; height: 120px;">', unsafe_allow_html=True)
+        try:
+            st.image("Moon Valley Logo.png", width=80)
+        except:
+            st.markdown('<div style="text-align: center; font-size: 3rem;">🏢</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("""
+        <div style="text-align: center; padding: 20px;">
+            <h1 style="
+                font-size: 3.8rem; 
+                font-weight: bold; 
+                color: #1f77b4; 
+                margin: 0;
+                text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+                line-height: 1.1;
+            ">
+                MVN Great Save Raffle
+            </h1>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown('<div style="display: flex; justify-content: center; align-items: center; height: 120px;">', unsafe_allow_html=True)
+        try:
+            st.image("Moon Valley Logo.png", width=80)
+        except:
+            st.markdown('<div style="text-align: center; font-size: 3rem;">🏢</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)cts as go
 from datetime import datetime
 import base64
 from typing import Optional
@@ -25,7 +58,7 @@ def fetch_photo_via_proxy(photo_url: str, proxy_base: str = "http://localhost:80
             key = photo_url.split("key=")[1].split("&")[0]
             proxy_url = f"{proxy_base}/kpa-photo?key={key}"
             
-            with st.spinner("📸 Loading winner photo..."):
+            with st.spinner("� Loading winner photo..."):
                 response = requests.get(proxy_url, timeout=30)
                 if response.status_code == 200:
                     photo_data = response.content
@@ -139,24 +172,28 @@ def draw_winner_card(name: str, location: str, level: str, photo_bytes: Optional
     return img
 
 def main():
-    # Title with perfectly aligned MVN logos
+    # Custom CSS for centered title with larger font
     st.markdown("""
     <style>
-    .logo-container {
+    .main-title {
+        text-align: center;
+        font-size: 4rem;
+        font-weight: bold;
+        color: #1f77b4;
+        margin: 2rem 0;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    .logo-title-container {
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 20px 0;
-        margin-bottom: 20px;
+        gap: 2rem;
+        margin: 2rem 0;
     }
-    .title-text {
-        font-size: 3.8rem;
-        font-weight: bold;
-        color: #1f77b4;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        margin: 0 40px;
-        text-align: center;
-        line-height: 1.1;
+    .mvn-logo {
+        width: 80px;
+        height: 80px;
+        object-fit: contain;
     }
     .subtitle {
         text-align: center;
@@ -167,32 +204,23 @@ def main():
     </style>
     """, unsafe_allow_html=True)
     
-    # Single centered logo above title - moved right for better alignment
-    # Use margin offset to move logo to the right
-    try:
-        # Use columns with unequal spacing to shift logo right
-        col1, col2, col3 = st.columns([2.75, 2, 1.25])
-                
-        with col2:
-            st.image("Moon Valley Logo.png", width=150)
-    except:
-        st.markdown('<div style="text-align: center; font-size: 5rem; color: #cc0000; margin: 20px 0 20px 80px;">🏢</div>', unsafe_allow_html=True)
+    # Title with MVN logos on each side
+    col1, col2, col3 = st.columns([1, 2, 1])
     
-    # Centered title below logo with RED color to match logo
-    st.markdown("""
-    <div style="text-align: center; margin: 20px 0;">
-        <h1 style="
-            font-size: 4rem; 
-            font-weight: bold; 
-            color: #cc0000; 
-            margin: 0;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-            line-height: 1.1;
-        ">
-            MVN Great Save Raffle
-        </h1>
-    </div>
-    """, unsafe_allow_html=True)
+    with col1:
+        try:
+            st.image("Moon Valley Logo.png", width=80)
+        except:
+            st.write("�")  # Fallback if logo not found
+    
+    with col2:
+        st.markdown('<h1 class="main-title">MVN Great Save Raffle</h1>', unsafe_allow_html=True)
+    
+    with col3:
+        try:
+            st.image("Moon Valley Logo.png", width=80)
+        except:
+            st.write("🏢")  # Fallback if logo not found
     
     st.markdown('<div class="subtitle">🎊 Pick your winner and celebrate! 🎊</div>', unsafe_allow_html=True)
     
@@ -310,41 +338,8 @@ def main():
             level = str(winner.get(level_col, "")).strip() or "Unknown Level"
             photo_field = str(winner.get(photo_col, "")).strip()
             
-            # 🎉 WINNER ANNOUNCEMENT WITH CELEBRATIONS! 🎉
-            st.balloons()
-            
-            # Add some visual celebration elements
-            st.markdown("""
-            <div style="text-align: center; font-size: 3rem; animation: pulse 1s infinite;">
-                🏆 🎊 🎉 WINNER! 🎉 🎊 🏆
-            </div>
-            <style>
-            @keyframes pulse {
-                0% { transform: scale(1); }
-                50% { transform: scale(1.1); }
-                100% { transform: scale(1); }
-            }
-            </style>
-            <script>
-            // Simple celebration sound using Web Audio API
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const playCheer = () => {
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime); // C5
-                oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1); // E5
-                oscillator.frequency.setValueAtTime(783.99, audioContext.currentTime + 0.2); // G5
-                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.5);
-            };
-            playCheer();
-            </script>
-            """, unsafe_allow_html=True)
-            
+            # 🎉 WINNER ANNOUNCEMENT WITH SNOW! 🎉
+            st.snow()
             st.success(f"🏆 WINNER: {name}! 🏆")
             
             # Celebratory sound effect simulation

@@ -25,7 +25,7 @@ def fetch_photo_via_proxy(photo_url: str, proxy_base: str = "http://localhost:80
             key = photo_url.split("key=")[1].split("&")[0]
             proxy_url = f"{proxy_base}/kpa-photo?key={key}"
             
-            with st.spinner("📸 Loading winner photo..."):
+            with st.spinner("� Loading winner photo..."):
                 response = requests.get(proxy_url, timeout=30)
                 if response.status_code == 200:
                     photo_data = response.content
@@ -139,62 +139,8 @@ def draw_winner_card(name: str, location: str, level: str, photo_bytes: Optional
     return img
 
 def main():
-    # Title with perfectly aligned MVN logos
-    st.markdown("""
-    <style>
-    .logo-container {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 20px 0;
-        margin-bottom: 20px;
-    }
-    .title-text {
-        font-size: 3.8rem;
-        font-weight: bold;
-        color: #1f77b4;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        margin: 0 40px;
-        text-align: center;
-        line-height: 1.1;
-    }
-    .subtitle {
-        text-align: center;
-        font-size: 1.5rem;
-        color: #666;
-        margin-bottom: 2rem;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    # Single centered logo above title - moved right for better alignment
-    # Use margin offset to move logo to the right
-    try:
-        # Use columns with unequal spacing to shift logo right
-        col1, col2, col3 = st.columns([2.75, 2, 1.25])
-                
-        with col2:
-            st.image("Moon Valley Logo.png", width=150)
-    except:
-        st.markdown('<div style="text-align: center; font-size: 5rem; color: #cc0000; margin: 20px 0 20px 80px;">🏢</div>', unsafe_allow_html=True)
-    
-    # Centered title below logo with RED color to match logo
-    st.markdown("""
-    <div style="text-align: center; margin: 20px 0;">
-        <h1 style="
-            font-size: 4rem; 
-            font-weight: bold; 
-            color: #cc0000; 
-            margin: 0;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-            line-height: 1.1;
-        ">
-            MVN Great Save Raffle
-        </h1>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown('<div class="subtitle">🎊 Pick your winner and celebrate! 🎊</div>', unsafe_allow_html=True)
+    st.title("🎯 MVN Great Save Raffle")
+    st.markdown("### 🎊 Pick your winner and celebrate! 🎊")
     
     # File upload
     uploaded_file = st.file_uploader("📁 Upload CSV File", type=['csv'])
@@ -203,18 +149,20 @@ def main():
         df = pd.read_csv(uploaded_file)
         st.success(f"✅ Successfully loaded {len(df)} participants!")
         
-        # Use the exact long column names from the CSV
-        name_col = "Name of employee that earned the Great Save Raffle ticket?"
-        location_col = "What MVN location does employee work at?"
-        level_col = "What level of ticket was earned?"
-        photo_col = "Photo of the employee holding the ticket. (Will be used if drawn))"
+        # Use standard long column names directly - no mapping needed
+        expected_columns = {
+            'First Name': 'name',
+            'Last Name': 'last_name', 
+            'Location': 'location',
+            'Ticket Level': 'level',
+            'Photo': 'photo'
+        }
         
         # Check if we have the expected columns
-        expected_columns = [name_col, location_col, level_col, photo_col]
-        missing_cols = [col for col in expected_columns if col not in df.columns]
-        
+        missing_cols = [col for col in expected_columns.keys() if col not in df.columns]
         if missing_cols:
-            st.warning(f"⚠️ Missing expected columns: {len(missing_cols)} out of {len(expected_columns)}")
+            st.warning(f"⚠️ Missing expected columns: {missing_cols}")
+            st.info("Expected columns: First Name, Last Name, Location, Ticket Level, Photo")
             st.subheader("Available columns in your CSV:")
             st.write(list(df.columns))
         else:
@@ -234,117 +182,19 @@ def main():
             # 🎊 CELEBRATORY EFFECTS! 🎊
             st.balloons()
             
-            # 🕐 DRAMATIC 5-SECOND COUNTDOWN! 🕐
-            countdown_placeholder = st.empty()
-            beep_placeholder = st.empty()
-            
-            for i in range(5, 0, -1):
-                # Big pulsating countdown number
-                countdown_placeholder.markdown(f"""
-                <div style="
-                    text-align: center; 
-                    font-size: 8rem; 
-                    font-weight: bold; 
-                    color: #ff4b4b;
-                    text-shadow: 0 0 20px #ff4b4b;
-                    animation: pulse 0.5s ease-in-out;
-                    margin: 2rem 0;
-                ">
-                    {i}
-                </div>
-                <style>
-                @keyframes pulse {{
-                    0% {{ transform: scale(1); opacity: 0.7; }}
-                    50% {{ transform: scale(1.2); opacity: 1; }}
-                    100% {{ transform: scale(1); opacity: 0.7; }}
-                }}
-                </style>
-                """, unsafe_allow_html=True)
-                
-                # Beep sound simulation with visual indicator
-                beep_placeholder.markdown(f"""
-                <div style="
-                    text-align: center; 
-                    font-size: 2rem; 
-                    color: #ffd700;
-                    margin: 1rem 0;
-                ">
-                    🔊 BEEP! 🔊
-                </div>
-                """, unsafe_allow_html=True)
-                
-                time.sleep(1)
-                beep_placeholder.empty()
-            
-            # Clear countdown
-            countdown_placeholder.empty()
-            
-            # WINNER REVEAL WITH FANFARE!
-            st.markdown("""
-            <div style="
-                text-align: center; 
-                font-size: 4rem; 
-                font-weight: bold; 
-                color: #00ff00;
-                text-shadow: 0 0 30px #00ff00;
-                animation: winner-reveal 2s ease-in-out;
-                margin: 2rem 0;
-            ">
-                🎊 WINNER SELECTED! 🎊
-            </div>
-            <style>
-            @keyframes winner-reveal {
-                0% { transform: scale(0); opacity: 0; }
-                50% { transform: scale(1.3); opacity: 0.8; }
-                100% { transform: scale(1); opacity: 1; }
-            }
-            </style>
-            """, unsafe_allow_html=True)
-            
             winner_idx = random.randint(0, len(df) - 1)
             winner = df.iloc[winner_idx]
             
-            # Use the exact long column names
-            name = str(winner.get(name_col, "")).strip() or "Unknown Employee"
-            location = str(winner.get(location_col, "")).strip() or "Unknown Location"
-            level = str(winner.get(level_col, "")).strip() or "Unknown Level"
-            photo_field = str(winner.get(photo_col, "")).strip()
+            # Use direct column names (combine first and last name)
+            first_name = str(winner.get('First Name', "")).strip()
+            last_name = str(winner.get('Last Name', "")).strip()
+            name = f"{first_name} {last_name}".strip()
+            location = str(winner.get('Location', "")).strip()
+            level = str(winner.get('Ticket Level', "")).strip()
+            photo_field = str(winner.get('Photo', "")).strip()
             
-            # 🎉 WINNER ANNOUNCEMENT WITH CELEBRATIONS! 🎉
-            st.balloons()
-            
-            # Add some visual celebration elements
-            st.markdown("""
-            <div style="text-align: center; font-size: 3rem; animation: pulse 1s infinite;">
-                🏆 🎊 🎉 WINNER! 🎉 🎊 🏆
-            </div>
-            <style>
-            @keyframes pulse {
-                0% { transform: scale(1); }
-                50% { transform: scale(1.1); }
-                100% { transform: scale(1); }
-            }
-            </style>
-            <script>
-            // Simple celebration sound using Web Audio API
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const playCheer = () => {
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime); // C5
-                oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1); // E5
-                oscillator.frequency.setValueAtTime(783.99, audioContext.currentTime + 0.2); // G5
-                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.5);
-            };
-            playCheer();
-            </script>
-            """, unsafe_allow_html=True)
-            
+            # 🎉 WINNER ANNOUNCEMENT WITH SNOW! 🎉
+            st.snow()
             st.success(f"🏆 WINNER: {name}! 🏆")
             
             # Celebratory sound effect simulation
