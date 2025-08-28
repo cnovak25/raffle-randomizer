@@ -46,40 +46,53 @@ async def get_kpa_photo(key: str = Query(..., description="KPA photo key")):
             del cache[key]
     
     try:
-        # Decode the key
-        decoded_key = requests.utils.unquote(key)
-        
-        # Construct KPA URL
-        kpa_url = f"https://mvncorp.kpadata.com/kpa/get-upload?key={key}"
+        # Construct KPA URL with correct domain and path
+        kpa_url = f"https://mvncorp.kpaehs.com/get-upload?key={key}"
+        print(f"Fetching photo from: {kpa_url}")
         
         # Set up headers with session cookie
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Cookie': f'KPASESSIONID={KPA_SESSION_COOKIE}',
-            'Referer': 'https://mvncorp.kpadata.com/',
+            'Cookie': f'ASP.NET_SessionId={KPA_SESSION_COOKIE}',
+            'Referer': 'https://mvncorp.kpaehs.com/',
             'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
         }
+        print(f"Using headers: {headers}")
         
-        # Fetch photo from KPA
-        response = requests.get(kpa_url, headers=headers, timeout=30)
+        # Fetch photo from KPA with redirect handling
+        response = requests.get(kpa_url, headers=headers, timeout=30, allow_redirects=True)
+        print(f"KPA response status: {response.status_code}")
+        print(f"Final URL after redirects: {response.url}")
+        print(f"Response headers: {dict(response.headers)}")
         
         if response.status_code == 200:
+            print(f"Photo size: {len(response.content)} bytes")
+            print(f"Content type: {response.headers.get('content-type', 'unknown')}")
+            
             # Cache the result
             cache[key] = (response.content, time.time())
             
-            # Return the image
+            # Return the image with proper content type
+            content_type = response.headers.get('content-type', 'image/jpeg')
             return Response(
                 content=response.content, 
-                media_type="image/jpeg",
-                headers={"Cache-Control": "public, max-age=3600"}
+                media_type=content_type,
+                headers={
+                    "Cache-Control": "public, max-age=3600",
+                    "Access-Control-Allow-Origin": "*"
+                }
             )
         else:
+            print(f"KPA error response: {response.text[:200]}...")
             raise HTTPException(
                 status_code=response.status_code, 
                 detail=f"Failed to fetch photo from KPA: {response.status_code}"
             )
             
     except Exception as e:
+        print(f"Exception in get_kpa_photo: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error fetching photo: {str(e)}")
 
 if __name__ == "__main__":
