@@ -6,6 +6,7 @@ import plotly.express as px
 from datetime import datetime
 import base64
 from typing import Optional
+from safety_checker import KPASafetyChecker
 
 # Configure page for mobile-first responsive design
 st.set_page_config(
@@ -48,6 +49,33 @@ def fetch_photo_directly(photo_url: str) -> Optional[bytes]:
 def fetch_photo_via_proxy(photo_url: str, proxy_base: str = None) -> Optional[bytes]:
     """Legacy proxy method - fallback to direct fetch"""
     return fetch_photo_directly(photo_url)
+
+def check_safety_violations(employee_name: str, proxy_base: str = "https://raffle-randomizer-production.up.railway.app") -> dict:
+    """Check if employee has safety violations via Railway proxy"""
+    try:
+        safety_url = f"{proxy_base}/safety-check?employee_name={employee_name}"
+        
+        with st.spinner(f"🔍 Checking safety record for {employee_name}..."):
+            response = requests.get(safety_url, timeout=30)
+            
+            if response.status_code == 200:
+                result = response.json()
+                return result
+            else:
+                st.error(f"❌ Safety check failed (HTTP {response.status_code})")
+                return {
+                    "employee_name": employee_name,
+                    "is_eligible": None,
+                    "reason": f"Safety check API failed: HTTP {response.status_code}"
+                }
+                
+    except Exception as e:
+        st.error(f"❌ Safety check error: {str(e)}")
+        return {
+            "employee_name": employee_name,
+            "is_eligible": None,
+            "reason": f"Safety check error: {str(e)}"
+        }
 
 def draw_winner_card(name: str, location: str, level: str, photo_bytes: Optional[bytes]) -> Image.Image:
     """Create winner card with proper photo rendering - LANDSCAPE with ROTATED PHOTO"""
@@ -457,8 +485,15 @@ def main():
             # Winner selection
             st.subheader("🎰 Pick Your Winner!")
             
-            # Photo option
-            use_proxy = st.checkbox("🔗 Use KPA Proxy Server (recommended)", value=True)
+            # Options row
+            col1, col2 = st.columns(2)
+            with col1:
+                use_proxy = st.checkbox("🔗 Use KPA Proxy Server (recommended)", value=True)
+            with col2:
+                use_safety_check = st.checkbox("🛡️ Check Safety Violations (Response ID 244699)", value=False)
+            
+            if use_safety_check:
+                st.info("ℹ️ Safety check will verify winner has no safety violations before final confirmation.")
             
             if st.button("🎲 Random Selection", type="primary"):
                 # 🎊 CELEBRATORY EFFECTS! 🎊
@@ -523,43 +558,94 @@ def main():
                 
                 st.success(f"🏆 WINNER: {name}! 🏆")
                 
+                # Safety check if enabled
+                safety_eligible = True
+                safety_message = ""
+                
+                if use_safety_check:
+                    with st.spinner("🛡️ Performing safety violation check..."):
+                        try:
+                            safety_checker = KPASafetyChecker()
+                            safety_result = safety_checker.check_winner_eligibility(name)
+                            
+                            if safety_result.get('found_in_kpa', False):
+                                violations_count = safety_result.get('violations_found', 0)
+                                if violations_count > 0:
+                                    safety_eligible = False
+                                    safety_message = f"⚠️ Safety Check Failed: {violations_count} violation(s) found (Response ID 244699)"
+                                    st.error(safety_message)
+                                    st.warning("🔄 This winner is not eligible. Please select another winner.")
+                                    
+                                    # Show violation details
+                                    with st.expander("📋 View Safety Violation Details"):
+                                        st.json(safety_result)
+                                else:
+                                    safety_message = "✅ Safety Check Passed: No violations found"
+                                    st.success(safety_message)
+                            else:
+                                safety_message = "⚠️ Safety Check: Employee not found in KPA system"
+                                st.warning(safety_message)
+                                
+                        except Exception as e:
+                            safety_message = f"❌ Safety Check Error: {str(e)}"
+                            st.error(safety_message)
+                            st.info("Proceeding without safety check due to error.")
+                
                 # Celebratory sound effect simulation
                 st.markdown("### 🎺🎺🎺 CONGRATULATIONS! 🎺🎺🎺")
                 
                 # Display winner info with celebration
-                col1, col2, col3 = st.columns(3)
+                col1, col2, col3, col4 = st.columns(4)
                 with col1:
                     st.metric("🌟 Winner", name, delta="SELECTED!")
                 with col2:
                     st.metric("🏢 Location", location, delta="🎯")
                 with col3:
                     st.metric("🎫 Ticket Level", level, delta="🎊")
+                with col4:
+                    if use_safety_check:
+                        safety_status = "✅ ELIGIBLE" if safety_eligible else "❌ NOT ELIGIBLE"
+                        safety_delta = "Safe" if safety_eligible else "Violations"
+                        st.metric("🛡️ Safety Check", safety_status, delta=safety_delta)
+                    else:
+                        st.metric("🛡️ Safety Check", "SKIPPED", delta="Not Checked")
                     
                 st.info(f"📊 Selected from row {winner_idx + 1} of {len(df)} participants")
                 
-                # Fetch photo (keeping all the proxy functionality)
-                photo_bytes = None
-                if use_proxy and photo_field:
-                    photo_bytes = fetch_photo_via_proxy(photo_field)
-                elif photo_field:
-                    st.info("📸 Proxy disabled - skipping photo")
+                # Only proceed with photo and card generation if safety eligible (or safety check disabled)
+                if safety_eligible:
+                    # Fetch photo (keeping all the proxy functionality UNCHANGED)
+                    photo_bytes = None
+                    if use_proxy and photo_field:
+                        photo_bytes = fetch_photo_via_proxy(photo_field)
+                    elif photo_field:
+                        st.info("📸 Proxy disabled - skipping photo")
+                    else:
+                        st.warning("📸 No photo URL provided")
+                        
+                    # Generate winner card
+                    with st.spinner("🎨 Creating winner card..."):
+                        card = draw_winner_card(name=name, location=location, level=level, photo_bytes=photo_bytes)
+                        
+                    st.markdown("### 🎊 Winner Card Generated!")
+                    st.image(card, caption=f"🏆 Winner: {name}", use_container_width=True)
+                    
+                    # More celebration!
+                    st.markdown("---")
+                    st.markdown("### 🎉 SHARE THE CELEBRATION! 🎉")
+                    st.info("Right-click the winner card above to save and share!")
+                    
+                    # Confetti effect with emojis
+                    st.markdown("🎊🎉🎊🎉🎊🎉🎊🎉🎊🎉🎊🎉🎊🎉🎊")
                 else:
-                    st.warning("📸 No photo URL provided")
-                    
-                # Generate winner card
-                with st.spinner("🎨 Creating winner card..."):
-                    card = draw_winner_card(name=name, location=location, level=level, photo_bytes=photo_bytes)
-                    
-                st.markdown("### 🎊 Winner Card Generated!")
-                st.image(card, caption=f"🏆 Winner: {name}", use_container_width=True)
+                    st.markdown("---")
+                    st.error("🚫 Winner card not generated due to safety violations. Please select another winner.")
+                    st.info("💡 Click 'Random Selection' again to pick a new winner.")
                 
-                # More celebration!
-                st.markdown("---")
-                st.markdown("### 🎉 SHARE THE CELEBRATION! 🎉")
-                st.info("Right-click the winner card above to save and share!")
-                
-                # Confetti effect with emojis
-                st.markdown("🎊🎉🎊🎉🎊🎉🎊🎉🎊🎉🎊🎉🎊🎉🎊")
+                # Show safety message if any
+                if safety_message:
+                    st.markdown("---")
+                    st.markdown(f"**Safety Check Result:** {safety_message}")
         
         with tab2:
             # Analytics Dashboard
