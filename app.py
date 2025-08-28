@@ -2,6 +2,7 @@ import os, io, time, random, requests, pandas as pd, streamlit as st
 from urllib.parse import urlparse, parse_qs, unquote
 from PIL import Image, ImageDraw, ImageFont
 import plotly.graph_objects as go
+import plotly.express as px
 from datetime import datetime
 import base64
 from typing import Optional
@@ -144,6 +145,225 @@ def draw_winner_card(name: str, location: str, level: str, photo_bytes: Optional
 
     return img
 
+def create_analytics_dashboard(df: pd.DataFrame):
+    """Create comprehensive analytics dashboard with charts and insights"""
+    
+    # Use the exact column names from the CSV
+    name_col = "Name of employee that earned the Great Save Raffle ticket?"
+    location_col = "What MVN location does employee work at?"
+    level_col = "What level of ticket was earned?"
+    photo_col = "Photo of the employee holding the ticket. (Will be used if drawn))"
+    
+    st.header("📊 Raffle Analytics Dashboard")
+    
+    # Key metrics row
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric(
+            "Total Participants", 
+            len(df),
+            delta=f"100% Eligible"
+        )
+    
+    with col2:
+        locations = df[location_col].nunique() if location_col in df.columns else 0
+        st.metric(
+            "Locations", 
+            locations,
+            delta="🏢 Offices"
+        )
+    
+    with col3:
+        levels = df[level_col].nunique() if level_col in df.columns else 0
+        st.metric(
+            "Ticket Levels", 
+            levels,
+            delta="🎫 Types"
+        )
+    
+    with col4:
+        photos = df[photo_col].notna().sum() if photo_col in df.columns else 0
+        photo_rate = (photos / len(df)) * 100 if len(df) > 0 else 0
+        st.metric(
+            "Photo Coverage", 
+            f"{photo_rate:.1f}%",
+            delta=f"{photos} photos"
+        )
+    
+    st.markdown("---")
+    
+    # Charts section
+    col1, col2 = st.columns(2)
+    
+    # Location Distribution Chart
+    with col1:
+        if location_col in df.columns:
+            st.subheader("🏢 Location Distribution")
+            location_counts = df[location_col].value_counts()
+            
+            # Create pie chart
+            fig_pie = px.pie(
+                values=location_counts.values,
+                names=location_counts.index,
+                title="Participants by Location",
+                color_discrete_sequence=px.colors.qualitative.Set3
+            )
+            fig_pie.update_traces(textposition='inside', textinfo='percent+label')
+            fig_pie.update_layout(showlegend=True, height=400)
+            st.plotly_chart(fig_pie, use_container_width=True)
+            
+            # Location stats table
+            st.subheader("📍 Location Breakdown")
+            location_df = pd.DataFrame({
+                'Location': location_counts.index,
+                'Participants': location_counts.values,
+                'Percentage': [f"{(count/len(df)*100):.1f}%" for count in location_counts.values]
+            })
+            st.dataframe(location_df, use_container_width=True)
+    
+    # Ticket Level Distribution Chart
+    with col2:
+        if level_col in df.columns:
+            st.subheader("🎫 Ticket Level Distribution")
+            level_counts = df[level_col].value_counts()
+            
+            # Create bar chart
+            fig_bar = px.bar(
+                x=level_counts.index,
+                y=level_counts.values,
+                title="Participants by Ticket Level",
+                labels={'x': 'Ticket Level', 'y': 'Number of Participants'},
+                color=level_counts.values,
+                color_continuous_scale='viridis'
+            )
+            fig_bar.update_layout(showlegend=False, height=400)
+            st.plotly_chart(fig_bar, use_container_width=True)
+            
+            # Level stats table
+            st.subheader("🎟️ Level Breakdown")
+            level_df = pd.DataFrame({
+                'Ticket Level': level_counts.index,
+                'Participants': level_counts.values,
+                'Percentage': [f"{(count/len(df)*100):.1f}%" for count in level_counts.values]
+            })
+            st.dataframe(level_df, use_container_width=True)
+    
+    st.markdown("---")
+    
+    # Combined Analysis
+    if location_col in df.columns and level_col in df.columns:
+        st.subheader("🔍 Cross-Analysis: Location vs Ticket Level")
+        
+        # Create heatmap
+        cross_table = pd.crosstab(df[location_col], df[level_col], margins=True)
+        
+        # Remove margins for the heatmap
+        heatmap_data = cross_table.iloc[:-1, :-1]
+        
+        fig_heatmap = px.imshow(
+            heatmap_data.values,
+            labels=dict(x="Ticket Level", y="Location", color="Count"),
+            x=heatmap_data.columns,
+            y=heatmap_data.index,
+            color_continuous_scale='Blues',
+            title="Participant Distribution: Location vs Ticket Level"
+        )
+        fig_heatmap.update_layout(height=400)
+        st.plotly_chart(fig_heatmap, use_container_width=True)
+        
+        # Cross-tabulation table
+        st.subheader("📋 Detailed Cross-Tabulation")
+        st.dataframe(cross_table, use_container_width=True)
+    
+    st.markdown("---")
+    
+    # Photo Analysis
+    if photo_col in df.columns:
+        st.subheader("📸 Photo Coverage Analysis")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Photo availability by location
+            if location_col in df.columns:
+                photo_by_location = df.groupby(location_col)[photo_col].apply(lambda x: x.notna().sum()).reset_index()
+                photo_by_location['Total'] = df.groupby(location_col).size().values
+                photo_by_location['Coverage %'] = (photo_by_location[photo_col] / photo_by_location['Total'] * 100).round(1)
+                
+                fig_photo = px.bar(
+                    photo_by_location,
+                    x=location_col,
+                    y='Coverage %',
+                    title="Photo Coverage by Location",
+                    labels={'Coverage %': 'Photo Coverage (%)'},
+                    color='Coverage %',
+                    color_continuous_scale='greens'
+                )
+                fig_photo.update_layout(height=400)
+                st.plotly_chart(fig_photo, use_container_width=True)
+        
+        with col2:
+            # Photo availability by ticket level
+            if level_col in df.columns:
+                photo_by_level = df.groupby(level_col)[photo_col].apply(lambda x: x.notna().sum()).reset_index()
+                photo_by_level['Total'] = df.groupby(level_col).size().values
+                photo_by_level['Coverage %'] = (photo_by_level[photo_col] / photo_by_level['Total'] * 100).round(1)
+                
+                fig_photo_level = px.bar(
+                    photo_by_level,
+                    x=level_col,
+                    y='Coverage %',
+                    title="Photo Coverage by Ticket Level",
+                    labels={'Coverage %': 'Photo Coverage (%)'},
+                    color='Coverage %',
+                    color_continuous_scale='oranges'
+                )
+                fig_photo_level.update_layout(height=400)
+                st.plotly_chart(fig_photo_level, use_container_width=True)
+    
+    st.markdown("---")
+    
+    # Winner Simulation
+    st.subheader("🎲 Winner Probability Simulation")
+    st.info("This shows the theoretical probability of winning based on current data distribution.")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if location_col in df.columns:
+            location_probs = (df[location_col].value_counts() / len(df) * 100).round(2)
+            st.write("**🏢 Winning Probability by Location:**")
+            for location, prob in location_probs.items():
+                st.write(f"• {location}: {prob}%")
+    
+    with col2:
+        if level_col in df.columns:
+            level_probs = (df[level_col].value_counts() / len(df) * 100).round(2)
+            st.write("**🎫 Winning Probability by Ticket Level:**")
+            for level, prob in level_probs.items():
+                st.write(f"• {level}: {prob}%")
+    
+    # Data Quality Report
+    st.markdown("---")
+    st.subheader("🔍 Data Quality Report")
+    
+    quality_data = []
+    for col in [name_col, location_col, level_col, photo_col]:
+        if col in df.columns:
+            missing = df[col].isna().sum()
+            missing_pct = (missing / len(df)) * 100
+            quality_data.append({
+                'Field': col.replace('What ', '').replace('Name of employee that earned the Great Save Raffle ticket?', 'Employee Name'),
+                'Complete': len(df) - missing,
+                'Missing': missing,
+                'Completeness': f"{100 - missing_pct:.1f}%"
+            })
+    
+    if quality_data:
+        quality_df = pd.DataFrame(quality_data)
+        st.dataframe(quality_df, use_container_width=True)
+
 def main():
     # Title with perfectly aligned MVN logos
     st.markdown("""
@@ -202,7 +422,7 @@ def main():
     
     st.markdown('<div class="subtitle">🎊 Pick your winner and celebrate! 🎊</div>', unsafe_allow_html=True)
     
-    # File upload
+    # File upload (outside of tabs so it's always available)
     uploaded_file = st.file_uploader("📁 Upload CSV File", type=['csv'])
     
     if uploaded_file is not None:
@@ -226,17 +446,124 @@ def main():
         else:
             st.info("✅ All expected columns found!")
         
-        # Show data preview
-        st.subheader("👀 Data Preview")
-        st.dataframe(df.head())
+        # Create tabs
+        tab1, tab2 = st.tabs(["🎲 Raffle Selection", "📊 Analytics Dashboard"])
         
-        # Winner selection
-        st.subheader("🎰 Pick Your Winner!")
+        with tab1:
+            # Show data preview
+            st.subheader("👀 Data Preview")
+            st.dataframe(df.head())
+            
+            # Winner selection
+            st.subheader("🎰 Pick Your Winner!")
+            
+            # Photo option
+            use_proxy = st.checkbox("🔗 Use KPA Proxy Server (recommended)", value=True)
+            
+            if st.button("🎲 Random Selection", type="primary"):
+                # 🎊 CELEBRATORY EFFECTS! 🎊
+                st.balloons()
+                
+                # 🕐 DRAMATIC 5-SECOND COUNTDOWN! 🕐
+                countdown_placeholder = st.empty()
+                beep_placeholder = st.empty()
+                
+                for i in range(5, 0, -1):
+                    # Big pulsating countdown number
+                    countdown_placeholder.markdown(f"""
+                    <div style="
+                        text-align: center; 
+                        font-size: 8rem; 
+                        font-weight: bold; 
+                        color: #ff4444; 
+                        animation: pulse 0.5s ease-in-out;
+                        text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
+                        margin: 50px 0;
+                    ">
+                        {i}
+                    </div>
+                    <style>
+                    @keyframes pulse {{
+                        0% {{ transform: scale(1); }}
+                        50% {{ transform: scale(1.1); }}
+                        100% {{ transform: scale(1); }}
+                    }}
+                    </style>
+                    """, unsafe_allow_html=True)
+                    
+                    # Beep sound simulation
+                    beep_placeholder.markdown("### 🔊 BEEP!")
+                    time.sleep(1)
+                    beep_placeholder.empty()
+                
+                countdown_placeholder.empty()
+                
+                # 🎯 WINNER SELECTION! 🎯
+                winner_idx = random.randint(0, len(df) - 1)
+                winner = df.iloc[winner_idx]
+                
+                # Extract winner info
+                name = str(winner.get(name_col, "")).strip()
+                location = str(winner.get(location_col, "")).strip()
+                level = str(winner.get(level_col, "")).strip()
+                photo_field = str(winner.get(photo_col, "")).strip()
+                
+                # 🎉 WINNER ANNOUNCEMENT WITH SNOW! 🎉
+                st.snow()
+                
+                # Fanfare effect with JavaScript
+                st.markdown("""
+                <script>
+                function playCheer() {
+                    console.log("🎉 WINNER SELECTED! 🎉");
+                }
+                playCheer();
+                </script>
+                """, unsafe_allow_html=True)
+                
+                st.success(f"🏆 WINNER: {name}! 🏆")
+                
+                # Celebratory sound effect simulation
+                st.markdown("### 🎺🎺🎺 CONGRATULATIONS! 🎺🎺🎺")
+                
+                # Display winner info with celebration
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("🌟 Winner", name, delta="SELECTED!")
+                with col2:
+                    st.metric("🏢 Location", location, delta="🎯")
+                with col3:
+                    st.metric("🎫 Ticket Level", level, delta="🎊")
+                    
+                st.info(f"📊 Selected from row {winner_idx + 1} of {len(df)} participants")
+                
+                # Fetch photo (keeping all the proxy functionality)
+                photo_bytes = None
+                if use_proxy and photo_field:
+                    photo_bytes = fetch_photo_via_proxy(photo_field)
+                elif photo_field:
+                    st.info("📸 Proxy disabled - skipping photo")
+                else:
+                    st.warning("📸 No photo URL provided")
+                    
+                # Generate winner card
+                with st.spinner("🎨 Creating winner card..."):
+                    card = draw_winner_card(name=name, location=location, level=level, photo_bytes=photo_bytes)
+                    
+                st.markdown("### 🎊 Winner Card Generated!")
+                st.image(card, caption=f"🏆 Winner: {name}", use_container_width=True)
+                
+                # More celebration!
+                st.markdown("---")
+                st.markdown("### 🎉 SHARE THE CELEBRATION! 🎉")
+                st.info("Right-click the winner card above to save and share!")
+                
+                # Confetti effect with emojis
+                st.markdown("🎊🎉🎊🎉🎊🎉🎊🎉🎊🎉🎊🎉🎊🎉🎊")
         
-        # Photo option
-        use_proxy = st.checkbox("🔗 Use KPA Proxy Server (recommended)", value=True)
-        
-        if st.button("🎲 Random Selection", type="primary"):
+        with tab2:
+            # Analytics Dashboard
+            create_analytics_dashboard(df)
             # 🎊 CELEBRATORY EFFECTS! 🎊
             st.balloons()
             
