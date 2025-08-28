@@ -50,14 +50,14 @@ async def get_kpa_photo(key: str):
         
         # Headers with session authentication
         headers = {
-            'Cookie': f'ASP.NET_SessionId={KPA_SESSION_COOKIE}; last-subdomain={KPA_SUBDOMAIN_COOKIE}',
+            'Cookie': f'6Pphk3dbK4Y-mvncorp={KPA_SESSION_COOKIE}; last-subdomain={KPA_SUBDOMAIN_COOKIE}',
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Referer': 'https://mvncorp.kpaehs.com/',
             'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
         }
         
         print(f"🔍 Fetching photo: {photo_url}")
-        print(f"🍪 Using ASP.NET_SessionId: {KPA_SESSION_COOKIE[:20]}...")
+        print(f"🍪 Using 6Pphk3dbK4Y-mvncorp: {KPA_SESSION_COOKIE[:20]}...")
         print(f"🍪 Using last-subdomain: {KPA_SUBDOMAIN_COOKIE[:20]}...")
         
         # Fetch the photo with redirect following
