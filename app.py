@@ -20,12 +20,12 @@ def fetch_photo_directly(photo_url: str) -> Optional[bytes]:
         return None
     
     try:
-        # Extract employee ID or key from URL
+        # Extract the key from the KPA URL
         if "key=" in photo_url:
             key = photo_url.split("key=")[1].split("&")[0]
             
             # Use Railway proxy for KPA photo access
-            proxy_url = f"https://raffle-randomizer-production.up.railway.app/kpa-photo?emp_id={key}"
+            proxy_url = f"https://raffle-randomizer-production.up.railway.app/kpa-photo?key={key}"
             
             with st.spinner("📸 Loading winner photo..."):
                 response = requests.get(proxy_url, timeout=15)
