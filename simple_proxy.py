@@ -20,6 +20,17 @@ def home():
 def health():
     return {"status": "healthy"}
 
+@app.route('/test')
+def test_endpoint():
+    """Test endpoint to verify proxy is working"""
+    test_key = request.args.get('key', 'test-key-123')
+    return {
+        "message": "Test endpoint working",
+        "test_key": test_key,
+        "session_cookie": f"{SESSION_COOKIE[:10]}...",
+        "test_url": f"https://mvncorp.kpadata.com/kpa/get-upload?key={test_key}"
+    }
+
 @app.route('/kpa-photo')
 def get_photo():
     key = request.args.get('key')
