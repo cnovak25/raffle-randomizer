@@ -24,7 +24,7 @@ def fetch_photo_directly(photo_url: str) -> Optional[bytes]:
         if "key=" in photo_url:
             key = photo_url.split("key=")[1].split("&")[0]
             
-            # Use Railway proxy for KPA photo access
+            # Use Railway proxy (Railway handles port routing automatically)
             proxy_url = f"https://raffle-randomizer-production.up.railway.app/kpa-photo?key={key}"
             
             with st.spinner("📸 Loading winner photo..."):
