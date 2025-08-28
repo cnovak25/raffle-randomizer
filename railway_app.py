@@ -25,27 +25,29 @@ app.add_middleware(
 )
 
 # Global variable for session cookie
-KPA_SESSION_COOKIE = os.environ.get('KPA_SESSION_COOKIE', 's:m3njt8thebwkb0kk0jnc6wj.460QPgA3FJzSxchjUanrUPbrMuthy6pX4vrz1DZuGQQ')
+KPA_SESSION_COOKIE = os.environ.get('KPA_SESSION_COOKIE', 's%3Am3njt8thebwkb0kk0jnc6wj.460QPgA3FJzSxchjUanrUPbrMuthy6pX4vrz1DZuGQQ')
+KPA_SUBDOMAIN_COOKIE = os.environ.get('KPA_SUBDOMAIN_COOKIE', 's%3Amvncorp.zRRHS9UAtvE%2BnpuY6dV%2BGi2N3E0F3StPtWmcfIjtNkM')
 
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
 
 @app.get("/kpa-photo")
-async def get_kpa_photo(photo_id: str):
+async def get_kpa_photo(key: str):
     """Proxy endpoint to fetch KPA employee photos with authentication"""
     try:
         # KPA photo URL - updated to correct domain and path
-        photo_url = f"https://mvncorp.kpaehs.com/get-upload?key={photo_id}"
+        photo_url = f"https://mvncorp.kpaehs.com/get-upload?key={key}"
         
         # Headers with session authentication
         headers = {
-            'Cookie': f'6Pphk3dbK4Y-mvncorp={KPA_SESSION_COOKIE}',
+            'Cookie': f'6Pphk3dbK4Y-mvncorp={KPA_SESSION_COOKIE}; last-subdomain={KPA_SUBDOMAIN_COOKIE}',
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
         
         print(f"🔍 Fetching photo: {photo_url}")
-        print(f"🍪 Using cookie: 6Pphk3dbK4Y-mvncorp={KPA_SESSION_COOKIE[:20]}...")
+        print(f"🍪 Using session cookie: 6Pphk3dbK4Y-mvncorp={KPA_SESSION_COOKIE[:20]}...")
+        print(f"🍪 Using subdomain cookie: last-subdomain={KPA_SUBDOMAIN_COOKIE[:20]}...")
         
         # Fetch the photo with redirect following
         response = requests.get(photo_url, headers=headers, timeout=15, allow_redirects=True)
@@ -106,7 +108,7 @@ async def root():
         "message": "MVN Raffle System", 
         "streamlit_url": f"http://localhost:{streamlit_port}",
         "proxy_health": "/health",
-        "photo_endpoint": "/kpa-photo?photo_id=YOUR_PHOTO_ID"
+        "photo_endpoint": "/kpa-photo?key=YOUR_PHOTO_KEY"
     }
 
 if __name__ == "__main__":
