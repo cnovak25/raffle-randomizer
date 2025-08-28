@@ -108,7 +108,7 @@ def draw_winner_card(name: str, location: str, level: str, photo_bytes: Optional
         d.rectangle([(0, i), (W, i+1)], fill=(r, g, b))
 
     # Title - back to single line for landscape
-    title_text = "🏆 GREAT SAVE RAFFLE — WINNER! 🏆"
+    title_text = "GREAT SAVE RAFFLE — WINNER!"
     title_bbox = d.textbbox((0, 0), title_text, font=title_font)
     title_width = title_bbox[2] - title_bbox[0]
     title_x = (W - title_width) // 2
@@ -116,7 +116,7 @@ def draw_winner_card(name: str, location: str, level: str, photo_bytes: Optional
     d.text((title_x, 30), title_text, fill="white", font=title_font)
     
     # Date
-    date_text = f"🎉 MVN {time.strftime('%B %d, %Y')} 🎉"
+    date_text = f"MVN {time.strftime('%B %d, %Y')}"
     date_bbox = d.textbbox((0, 0), date_text, font=info_font)
     date_width = date_bbox[2] - date_bbox[0]
     d.text(((W - date_width) // 2, 85), date_text, fill="white", font=info_font)
@@ -160,15 +160,15 @@ def draw_winner_card(name: str, location: str, level: str, photo_bytes: Optional
     info_start_y = 180  # Same level as photo
 
     # Name
-    d.text((info_x, info_start_y), "🌟 WINNER:", fill="white", font=name_font)
+    d.text((info_x, info_start_y), "WINNER:", fill="white", font=name_font)
     d.text((info_x, info_start_y + 45), name, fill=(255, 215, 0), font=name_font)
     
     # Location  
-    d.text((info_x, info_start_y + 110), "🏢 LOCATION:", fill="white", font=info_font)
+    d.text((info_x, info_start_y + 110), "LOCATION:", fill="white", font=info_font)
     d.text((info_x, info_start_y + 140), location, fill=(100, 200, 255), font=info_font)
     
     # Level
-    d.text((info_x, info_start_y + 190), "🎫 LEVEL:", fill="white", font=info_font)
+    d.text((info_x, info_start_y + 190), "LEVEL:", fill="white", font=info_font)
     d.text((info_x, info_start_y + 220), level, fill=(255, 150, 150), font=info_font)
 
     return img
@@ -543,8 +543,53 @@ def main():
                 level = str(winner.get(level_col, "")).strip()
                 photo_field = str(winner.get(photo_col, "")).strip()
                 
-                # 🎉 WINNER ANNOUNCEMENT WITH SNOW! 🎉
-                st.snow()
+                # 🎉 WINNER ANNOUNCEMENT WITH MOON CELEBRATION! 🎉
+                # Custom falling moon animation
+                st.markdown("""
+                <style>
+                .moon-fall {
+                    position: fixed;
+                    top: -30px;
+                    z-index: 1000;
+                    pointer-events: none;
+                    font-size: 20px;
+                    animation: fall linear infinite;
+                }
+                
+                @keyframes fall {
+                    0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+                    100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+                }
+                
+                .moon-fall:nth-child(1) { left: 10%; animation-duration: 3s; animation-delay: 0s; }
+                .moon-fall:nth-child(2) { left: 20%; animation-duration: 3.5s; animation-delay: 0.5s; }
+                .moon-fall:nth-child(3) { left: 30%; animation-duration: 4s; animation-delay: 1s; }
+                .moon-fall:nth-child(4) { left: 40%; animation-duration: 3.2s; animation-delay: 1.5s; }
+                .moon-fall:nth-child(5) { left: 50%; animation-duration: 3.8s; animation-delay: 2s; }
+                .moon-fall:nth-child(6) { left: 60%; animation-duration: 3.3s; animation-delay: 0.2s; }
+                .moon-fall:nth-child(7) { left: 70%; animation-duration: 4.2s; animation-delay: 0.8s; }
+                .moon-fall:nth-child(8) { left: 80%; animation-duration: 3.6s; animation-delay: 1.2s; }
+                .moon-fall:nth-child(9) { left: 90%; animation-duration: 3.9s; animation-delay: 1.8s; }
+                .moon-fall:nth-child(10) { left: 15%; animation-duration: 3.4s; animation-delay: 2.5s; }
+                </style>
+                
+                <div class="moon-fall">🌙</div>
+                <div class="moon-fall">🌛</div>
+                <div class="moon-fall">🌜</div>
+                <div class="moon-fall">🌙</div>
+                <div class="moon-fall">🌛</div>
+                <div class="moon-fall">🌜</div>
+                <div class="moon-fall">🌙</div>
+                <div class="moon-fall">🌛</div>
+                <div class="moon-fall">🌜</div>
+                <div class="moon-fall">🌙</div>
+                
+                <script>
+                setTimeout(() => {
+                    document.querySelectorAll('.moon-fall').forEach(el => el.remove());
+                }, 5000);
+                </script>
+                """, unsafe_allow_html=True)
                 
                 # Fanfare effect with JavaScript
                 st.markdown("""
