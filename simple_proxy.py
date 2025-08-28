@@ -8,8 +8,9 @@ import requests
 
 app = Flask(__name__)
 
-# Get session cookie from environment
+# Get session cookie from environment (with fallback)
 SESSION_COOKIE = os.environ.get('KPA_SESSION_COOKIE', '6Pphk3dbK4Y-mvncorp')
+print(f"Using KPA session cookie: {SESSION_COOKIE[:10]}...")  # Only show first 10 chars for security
 
 @app.route('/')
 def home():
