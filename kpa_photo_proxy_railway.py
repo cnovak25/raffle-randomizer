@@ -18,8 +18,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Get KPA session cookie from environment variable
+# Get KPA session cookies from environment variables
 KPA_SESSION_COOKIE = os.environ.get('KPA_SESSION_COOKIE', 's%3Am3njt8thebwkb0kk0jnc6wj.460QPgA3FJzSxchjUanrUPbrMuthy6pX4vrz1DZuGQQ')
+KPA_SUBDOMAIN_COOKIE = os.environ.get('KPA_SUBDOMAIN_COOKIE', 's%3Amvncorp.zRRHS9UAtvE%2BnpuY6dV%2BGi2N3E0F3StPtWmcfIjtNkM')
 
 # Simple in-memory cache
 cache = {}
@@ -27,11 +28,19 @@ CACHE_TTL = 3600  # 1 hour
 
 @app.get("/")
 async def root():
-    return {"message": "KPA Photo Proxy Server", "status": "running"}
+    return {"message": "KPA Photo Proxy Server - UPDATED", "status": "running", "version": "2.1.0"}
 
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
+
+@app.get("/debug")
+async def debug_info():
+    return {
+        "session_cookie": KPA_SESSION_COOKIE[:20] + "..." if KPA_SESSION_COOKIE else "Not set",
+        "subdomain_cookie": KPA_SUBDOMAIN_COOKIE[:20] + "..." if KPA_SUBDOMAIN_COOKIE else "Not set",
+        "cookie_format": "6Pphk3dbK4Y-mvncorp + last-subdomain"
+    }
 
 @app.get("/kpa-photo")
 async def get_kpa_photo(key: str = Query(..., description="KPA photo key")):
@@ -50,10 +59,10 @@ async def get_kpa_photo(key: str = Query(..., description="KPA photo key")):
         kpa_url = f"https://mvncorp.kpaehs.com/get-upload?key={key}"
         print(f"Fetching photo from: {kpa_url}")
         
-        # Set up headers with session cookie
+        # Set up headers with session cookies (updated format)
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Cookie': f'ASP.NET_SessionId={KPA_SESSION_COOKIE}',
+            'Cookie': f'6Pphk3dbK4Y-mvncorp={KPA_SESSION_COOKIE}; last-subdomain={KPA_SUBDOMAIN_COOKIE}',
             'Referer': 'https://mvncorp.kpaehs.com/',
             'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
         }
