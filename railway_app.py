@@ -25,7 +25,7 @@ app.add_middleware(
 )
 
 # Global variable for session cookie
-KPA_SESSION_COOKIE = os.environ.get('KPA_SESSION_COOKIE', 's%3Am3njt8thebwkb0kk0jnc6wj.460QPgA3FJzSxchjUanrUPbrMuthy6pX4vrz1DZuGQQ')
+KPA_SESSION_COOKIE = os.environ.get('KPA_SESSION_COOKIE', 's:m3njt8thebwkb0kk0jnc6wj.460QPgA3FJzSxchjUanrUPbrMuthy6pX4vrz1DZuGQQ')
 
 @app.get("/health")
 async def health_check():
@@ -81,7 +81,7 @@ async def get_kpa_photo(photo_id: str):
 
 def start_streamlit():
     """Start Streamlit in a separate thread"""
-    port = int(os.environ.get('PORT', 8501))
+    port = int(os.environ.get('PORT', 8080))  # Railway typically uses 8080
     streamlit_port = port + 1  # Use next port for Streamlit
     
     print(f"🎯 Starting Streamlit on port {streamlit_port}...")
@@ -100,7 +100,7 @@ def start_streamlit():
 @app.get("/")
 async def root():
     """Redirect to Streamlit app"""
-    port = int(os.environ.get('PORT', 8501))
+    port = int(os.environ.get('PORT', 8080))  # Railway typically uses 8080
     streamlit_port = port + 1
     return {
         "message": "MVN Raffle System", 
@@ -120,7 +120,7 @@ if __name__ == "__main__":
     time.sleep(3)
     
     # Start FastAPI on main port
-    port = int(os.environ.get('PORT', 8501))
+    port = int(os.environ.get('PORT', 8080))  # Railway typically uses 8080
     print(f"🚀 Starting FastAPI on port {port}...")
     
     uvicorn.run(
