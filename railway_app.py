@@ -32,6 +32,15 @@ KPA_SUBDOMAIN_COOKIE = os.environ.get('KPA_SUBDOMAIN_COOKIE', 's%3Amvncorp.zRRHS
 async def health_check():
     return {"status": "healthy"}
 
+@app.get("/debug")
+async def debug_info():
+    return {
+        "session_cookie": KPA_SESSION_COOKIE[:20] + "..." if KPA_SESSION_COOKIE else "Not set",
+        "subdomain_cookie": KPA_SUBDOMAIN_COOKIE[:20] + "..." if KPA_SUBDOMAIN_COOKIE else "Not set",
+        "session_full": KPA_SESSION_COOKIE,
+        "subdomain_full": KPA_SUBDOMAIN_COOKIE
+    }
+
 @app.get("/kpa-photo")
 async def get_kpa_photo(key: str):
     """Proxy endpoint to fetch KPA employee photos with authentication"""
@@ -41,13 +50,15 @@ async def get_kpa_photo(key: str):
         
         # Headers with session authentication
         headers = {
-            'Cookie': f'6Pphk3dbK4Y-mvncorp={KPA_SESSION_COOKIE}; last-subdomain={KPA_SUBDOMAIN_COOKIE}',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'Cookie': f'ASP.NET_SessionId={KPA_SESSION_COOKIE}; last-subdomain={KPA_SUBDOMAIN_COOKIE}',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Referer': 'https://mvncorp.kpaehs.com/',
+            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
         }
         
         print(f"🔍 Fetching photo: {photo_url}")
-        print(f"🍪 Using session cookie: 6Pphk3dbK4Y-mvncorp={KPA_SESSION_COOKIE[:20]}...")
-        print(f"🍪 Using subdomain cookie: last-subdomain={KPA_SUBDOMAIN_COOKIE[:20]}...")
+        print(f"🍪 Using ASP.NET_SessionId: {KPA_SESSION_COOKIE[:20]}...")
+        print(f"🍪 Using last-subdomain: {KPA_SUBDOMAIN_COOKIE[:20]}...")
         
         # Fetch the photo with redirect following
         response = requests.get(photo_url, headers=headers, timeout=15, allow_redirects=True)
