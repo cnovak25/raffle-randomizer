@@ -617,7 +617,7 @@ def main():
                                 violations_count = safety_result.get('violations_found', 0)
                                 if violations_count > 0:
                                     safety_eligible = False
-                                    safety_message = f"⚠️ Safety Check Failed: {violations_count} violation(s) found (Response ID 244699)"
+                                    safety_message = f"❌ Safety Check Failed: {violations_count} violation(s) found (Response ID 244699)"
                                     st.error(safety_message)
                                     st.warning("🔄 This winner is not eligible. Please select another winner.")
                                     
@@ -625,11 +625,12 @@ def main():
                                     with st.expander("📋 View Safety Violation Details"):
                                         st.json(safety_result)
                                 else:
-                                    safety_message = "✅ Safety Check Passed: No violations found"
+                                    safety_message = f"✅ Safety Check Passed: Employee '{name}' found in KPA with no violations"
                                     st.success(safety_message)
                             else:
-                                safety_message = "⚠️ Safety Check: Employee not found in KPA system"
+                                safety_message = f"⚠️ Safety Check: Employee '{name}' not found in KPA system"
                                 st.warning(safety_message)
+                                st.info("💡 This could be due to name spelling differences or employee not yet in KPA. Winner can proceed.")
                                 
                         except Exception as e:
                             safety_message = f"❌ Safety Check Error: {str(e)}"
