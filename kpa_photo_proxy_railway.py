@@ -19,7 +19,7 @@ app.add_middleware(
 )
 
 # Get KPA session cookie from environment variable
-KPA_SESSION_COOKIE = os.environ.get('KPA_SESSION_COOKIE', '6Pphk3dbK4Y-mvncorp')
+KPA_SESSION_COOKIE = os.environ.get('KPA_SESSION_COOKIE', 's%3Am3njt8thebwkb0kk0jnc6wj.460QPgA3FJzSxchjUanrUPbrMuthy6pX4vrz1DZuGQQ')
 
 # Simple in-memory cache
 cache = {}
