@@ -15,31 +15,20 @@ st.set_page_config(
 )
 
 def fetch_photo_directly(photo_url: str) -> Optional[bytes]:
-    """Fetch photo directly from KPA with session authentication"""
+    """Fetch photo via Railway proxy server"""
     if not photo_url or "get-upload" not in photo_url:
         return None
     
     try:
-        # Extract employee ID or key from URL for direct KPA photo access
+        # Extract employee ID or key from URL
         if "key=" in photo_url:
             key = photo_url.split("key=")[1].split("&")[0]
             
-            # Use the KPA session cookie from environment
-            kpa_session = os.environ.get('KPA_SESSION_COOKIE', '6Pphk3dbK4Y-mvncorp')
-            
-            # Try direct photo URL pattern
-            emp_id = key  # Assuming key is employee ID
-            direct_photo_url = f"https://mvnconnect.kpaonline.com/employeephotos/{emp_id}.jpg"
-            
-            headers = {
-                'Cookie': f'ASP.NET_SessionId={kpa_session}',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Referer': 'https://mvnconnect.kpaonline.com/',
-                'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
-            }
+            # Use Railway proxy for KPA photo access
+            proxy_url = f"https://raffle-randomizer-production.up.railway.app/kpa-photo?emp_id={key}"
             
             with st.spinner("📸 Loading winner photo..."):
-                response = requests.get(direct_photo_url, headers=headers, timeout=15)
+                response = requests.get(proxy_url, timeout=15)
                 if response.status_code == 200:
                     photo_data = response.content
                     st.success("✅ Photo loaded successfully!")
