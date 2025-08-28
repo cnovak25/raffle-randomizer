@@ -36,8 +36,8 @@ async def health_check():
 async def get_kpa_photo(key: str):
     """Proxy endpoint to fetch KPA employee photos with authentication"""
     try:
-        # KPA photo URL - using the correct thumbnail endpoint
-        photo_url = f"https://mvncorp.kpaehs.com/get-upload-thumb?key={key}&w=300&h=300&random=1"
+        # KPA photo URL - using the correct get-upload endpoint (not thumbnail)
+        photo_url = f"https://mvncorp.kpaehs.com/get-upload?key={key}"
         
         # Headers with session authentication
         headers = {
