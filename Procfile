@@ -1,1 +1,1 @@
-web: python -m streamlit run app.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true --server.enableCORS=false
+web: python -m streamlit run minimal_test.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true --server.enableCORS=false
