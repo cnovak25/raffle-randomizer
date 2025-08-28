@@ -28,7 +28,7 @@ def test_endpoint():
         "message": "Test endpoint working",
         "test_key": test_key,
         "session_cookie": f"{SESSION_COOKIE[:10]}...",
-        "test_url": f"https://mvncorp.kpadata.com/kpa/get-upload?key={test_key}"
+        "test_url": f"https://mvncorp.kpaehs.com/kpa/get-upload?key={test_key}"
     }
 
 @app.route('/kpa-photo')
@@ -38,15 +38,15 @@ def get_photo():
         return {"error": "Missing key parameter"}, 400
     
     try:
-        # Construct KPA URL
-        kpa_url = f"https://mvncorp.kpadata.com/kpa/get-upload?key={key}"
+        # Construct KPA URL - using the correct domain
+        kpa_url = f"https://mvncorp.kpaehs.com/kpa/get-upload?key={key}"
         print(f"Fetching photo from: {kpa_url}")
         
-        # Headers with session
+        # Headers with session - using correct session cookie name
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Cookie': f'KPASESSIONID={SESSION_COOKIE}',
-            'Referer': 'https://mvncorp.kpadata.com/',
+            'Cookie': f'ASP.NET_SessionId={SESSION_COOKIE}',
+            'Referer': 'https://mvncorp.kpaehs.com/',
             'Accept': 'image/*'
         }
         print(f"Using headers: {headers}")
