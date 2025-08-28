@@ -3,12 +3,12 @@ import os
 import subprocess
 import sys
 
-# Get port from environment or default to 8501
+# Use Railway's PORT directly - this is where Railway expects the service to respond
 port = os.environ.get('PORT', '8501')
 print(f"Railway PORT: {port}")
-print(f"All env vars with PORT: {[k for k in os.environ.keys() if 'PORT' in k]}")
+print(f"Starting Streamlit on Railway's expected port: {port}")
 
-# Run streamlit with explicit port
+# Run streamlit on Railway's assigned port
 cmd = [
     sys.executable, '-m', 'streamlit', 'run', 'minimal_test.py',
     '--server.port', str(port),
