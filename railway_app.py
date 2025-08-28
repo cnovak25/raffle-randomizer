@@ -44,22 +44,39 @@ async def get_kpa_photo(photo_id: str):
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
         
+        print(f"🔍 Fetching photo: {photo_url}")
+        print(f"🍪 Using cookie: 6Pphk3dbK4Y-mvncorp={KPA_SESSION_COOKIE[:20]}...")
+        
         # Fetch the photo with redirect following
-        response = requests.get(photo_url, headers=headers, timeout=10, allow_redirects=True)
+        response = requests.get(photo_url, headers=headers, timeout=15, allow_redirects=True)
+        
+        print(f"📊 Status: {response.status_code}")
+        print(f"🔗 Final URL: {response.url}")
+        print(f"📋 Content-Type: {response.headers.get('content-type', 'Unknown')}")
+        print(f"📏 Content-Length: {len(response.content)} bytes")
         
         if response.status_code == 200:
-            return Response(
-                content=response.content,
-                media_type="image/jpeg",
-                headers={
-                    "Cache-Control": "public, max-age=3600",
-                    "Access-Control-Allow-Origin": "*"
-                }
-            )
+            # Check if it's actually an image
+            content_type = response.headers.get('content-type', '').lower()
+            if 'image' in content_type or response.content.startswith(b'\xff\xd8\xff'):
+                return Response(
+                    content=response.content,
+                    media_type="image/jpeg",
+                    headers={
+                        "Cache-Control": "public, max-age=3600",
+                        "Access-Control-Allow-Origin": "*"
+                    }
+                )
+            else:
+                print(f"⚠️  Not an image - Content-Type: {content_type}")
+                print(f"🔍 First 200 chars: {response.text[:200]}")
+                raise HTTPException(status_code=500, detail="Response is not an image")
         else:
+            print(f"❌ HTTP {response.status_code}: {response.text[:200]}")
             raise HTTPException(status_code=404, detail="Photo not found")
             
     except Exception as e:
+        print(f"💥 Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching photo: {str(e)}")
 
 def start_streamlit():
