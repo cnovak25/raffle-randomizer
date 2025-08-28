@@ -1,4 +1,7 @@
 #!/bin/bash
-PORT=${PORT:-8501}
-echo "🚀 Starting Streamlit on port $PORT"
-python -m streamlit run app.py --server.port=$PORT --server.address=0.0.0.0 --server.headless=true --server.enableCORS=false
+echo "🚀 Railway Start Script"
+echo "PORT environment variable: $PORT"
+echo "All PORT-related env vars:"
+env | grep -i port || echo "No PORT env vars found"
+echo "Starting with Python script..."
+python run_minimal.py
