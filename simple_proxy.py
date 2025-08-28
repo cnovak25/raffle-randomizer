@@ -29,6 +29,7 @@ def get_photo():
     try:
         # Construct KPA URL
         kpa_url = f"https://mvncorp.kpadata.com/kpa/get-upload?key={key}"
+        print(f"Fetching photo from: {kpa_url}")
         
         # Headers with session
         headers = {
@@ -37,21 +38,29 @@ def get_photo():
             'Referer': 'https://mvncorp.kpadata.com/',
             'Accept': 'image/*'
         }
+        print(f"Using headers: {headers}")
         
         # Fetch photo
         response = requests.get(kpa_url, headers=headers, timeout=10)
+        print(f"KPA response status: {response.status_code}")
+        print(f"KPA response headers: {dict(response.headers)}")
         
         if response.status_code == 200:
+            print(f"Photo size: {len(response.content)} bytes")
             return Response(
                 response.content,
                 mimetype='image/jpeg',
                 headers={'Cache-Control': 'public, max-age=3600'}
             )
         else:
-            return {"error": f"KPA returned {response.status_code}"}, response.status_code
+            print(f"KPA error response: {response.text[:200]}...")
+            return {"error": f"KPA returned {response.status_code}", "details": response.text[:200]}, response.status_code
             
     except Exception as e:
-        return {"error": str(e)}, 500
+        print(f"Exception in get_photo: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {"error": str(e), "type": type(e).__name__}, 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8000))
