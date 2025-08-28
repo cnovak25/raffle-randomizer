@@ -112,11 +112,12 @@ def start_streamlit():
 
 @app.get("/")
 async def root():
-    """Redirect to Streamlit app"""
+    """Main endpoint with system info"""
     port = int(os.environ.get('PORT', 8080))  # Railway typically uses 8080
     streamlit_port = port + 1
     return {
-        "message": "MVN Raffle System", 
+        "message": "MVN Raffle System - Updated", 
+        "version": "2.0.0",
         "streamlit_url": f"http://localhost:{streamlit_port}",
         "proxy_health": "/health",
         "photo_endpoint": "/kpa-photo?key=YOUR_PHOTO_KEY"
