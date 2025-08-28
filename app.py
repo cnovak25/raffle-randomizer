@@ -552,7 +552,7 @@ def main():
                     top: -30px;
                     z-index: 1000;
                     pointer-events: none;
-                    font-size: 20px;
+                    font-size: 30px;
                     animation: fall linear infinite;
                 }
                 
