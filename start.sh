@@ -1,7 +1,4 @@
 #!/bin/bash
-echo "🚀 Railway Start Script"
-echo "PORT environment variable: $PORT"
-echo "All PORT-related env vars:"
-env | grep -i port || echo "No PORT env vars found"
-echo "Starting with Python script..."
-python run_minimal.py
+PORT=${PORT:-8000}
+echo "🚀 Starting KPA Photo Proxy on port $PORT"
+python -m uvicorn kpa_photo_proxy_railway:app --host 0.0.0.0 --port $PORT
