@@ -28,7 +28,7 @@ def test_endpoint():
         "message": "Test endpoint working",
         "test_key": test_key,
         "session_cookie": f"{SESSION_COOKIE[:10]}...",
-        "test_url": f"https://mvncorp.kpaehs.com/kpa/get-upload?key={test_key}"
+        "test_url": f"https://mvncorp.kpaehs.com/get-upload?key={test_key}"
     }
 
 @app.route('/kpa-photo')
@@ -38,8 +38,8 @@ def get_photo():
         return {"error": "Missing key parameter"}, 400
     
     try:
-        # Construct KPA URL - using the correct domain
-        kpa_url = f"https://mvncorp.kpaehs.com/kpa/get-upload?key={key}"
+        # Construct KPA URL - using the correct domain and path
+        kpa_url = f"https://mvncorp.kpaehs.com/get-upload?key={key}"
         print(f"Fetching photo from: {kpa_url}")
         
         # Headers with session - using correct session cookie name
@@ -52,15 +52,17 @@ def get_photo():
         print(f"Using headers: {headers}")
         
         # Fetch photo
-        response = requests.get(kpa_url, headers=headers, timeout=10)
+        response = requests.get(kpa_url, headers=headers, timeout=10, allow_redirects=True)
         print(f"KPA response status: {response.status_code}")
+        print(f"Final URL after redirects: {response.url}")
         print(f"KPA response headers: {dict(response.headers)}")
         
         if response.status_code == 200:
             print(f"Photo size: {len(response.content)} bytes")
+            print(f"Content type: {response.headers.get('content-type', 'unknown')}")
             return Response(
                 response.content,
-                mimetype='image/jpeg',
+                mimetype=response.headers.get('content-type', 'image/jpeg'),
                 headers={'Cache-Control': 'public, max-age=3600'}
             )
         else:
