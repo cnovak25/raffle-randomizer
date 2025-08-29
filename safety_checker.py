@@ -16,24 +16,23 @@ class KPASafetyChecker:
         self.proxy_base_url = "https://raffle-randomizer-production.up.railway.app"
     
     def check_winner_eligibility(self, employee_name: str) -> Dict:
-        """Complete eligibility check for a raffle winner using Railway proxy with correct KPA API"""
+        """Complete eligibility check for a raffle winner using Railway proxy"""
         print(f"🏆 Checking eligibility for winner: {employee_name}")
         
         try:
-            # Use the new Railway proxy safety-violations-v2 endpoint
+            # Use the new v2 safety violations endpoint with correct KPA API
             safety_url = f"{self.proxy_base_url}/safety-violations-v2"
             
             payload = {
                 "employee_name": employee_name
             }
             
-            print(f"🔍 Checking safety via Railway proxy (KPA API v1)...")
+            print(f"🔍 Checking safety via Railway proxy v2...")
             response = requests.post(safety_url, json=payload, timeout=30)
             
             if response.status_code == 200:
                 result = response.json()
                 print(f"✅ Safety check completed for: {employee_name}")
-                print(f"🎯 Result: {result.get('violations_found', 0)} violations found")
                 return result
             else:
                 print(f"❌ Safety check failed: HTTP {response.status_code}")
