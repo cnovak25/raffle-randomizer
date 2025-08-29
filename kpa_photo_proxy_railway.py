@@ -30,7 +30,7 @@ CACHE_TTL = 3600  # 1 hour
 
 @app.get("/")
 async def root():
-    return {"message": "KPA Photo Proxy Server - UPDATED", "status": "running", "version": "2.1.0"}
+    return {"message": "KPA Photo Proxy Server - CLEAN", "status": "running", "version": "2.2.0"}
 
 @app.get("/health")
 async def health():
@@ -43,131 +43,6 @@ async def debug_info():
         "subdomain_cookie": KPA_SUBDOMAIN_COOKIE[:20] + "..." if KPA_SUBDOMAIN_COOKIE else "Not set",
         "cookie_format": "6Pphk3dbK4Y-mvncorp + last-subdomain"
     }
-
-def get_auth_headers():
-    """Get authentication headers for KPA API calls"""
-    return {
-        'Cookie': f'6Pphk3dbK4Y-mvncorp={KPA_SESSION_COOKIE}; last-subdomain={KPA_SUBDOMAIN_COOKIE}',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://mvncorp.kpaehs.com/',
-        'Accept': 'application/json, text/plain, */*',
-        'Content-Type': 'application/json'
-    }
-
-@app.get("/safety-check")
-async def check_safety_violations(employee_name: str = Query(..., description="Employee name to check for safety violations")):
-    """Check if an employee has any safety violations using KPA API v1 responses endpoint"""
-    try:
-        print(f"🏆 Checking safety violations for: {employee_name}")
-        
-        # Use the correct KPA API v1 responses endpoint
-        api_url = "https://api.kpaehs.com/v1/responses.flat"
-        
-        # API payload with correct structure
-        payload = {
-            "token": "pTfES8COPXiB3fCCE0udSxg1g2vslyB2q",
-            "pretty": True,
-            "form_id": 244699,
-            "limit": 500,
-            "page": 1,
-            "skip_field_id_mapping": False,
-            "skip_field_id_mapping_json": False
-        }
-        
-        print(f"🔍 Querying KPA API for form 244699...")
-        response = requests.post(api_url, json=payload, timeout=30)
-        
-        if response.status_code != 200:
-            print(f"❌ API request failed: HTTP {response.status_code}")
-            return {
-                "employee_name": employee_name,
-                "found_in_kpa": False,
-                "is_eligible": None,
-                "reason": f"KPA API request failed: HTTP {response.status_code}",
-                "check_date": datetime.now().isoformat()
-            }
-        
-        data = response.json()
-        responses = data.get('responses', [])
-        
-        print(f"📊 Found {len(responses)} total safety violation records")
-        
-        # Search for the employee name in the responses
-        # The employee name field is "soo3nyistra1yb4y"
-        employee_violations = []
-        employee_found = False
-        
-        for violation_record in responses:
-            # Check if this record matches our employee
-            record_employee_name = violation_record.get('soo3nyistra1yb4y', '').strip()
-            
-            if record_employee_name.lower() == employee_name.lower():
-                employee_found = True
-                employee_violations.append(violation_record)
-                print(f"🔍 Found violation record for {employee_name}")
-        
-        if not employee_found:
-            print(f"✅ No violation records found for: {employee_name}")
-            return {
-                "employee_name": employee_name,
-                "found_in_kpa": True,  # We found them in the system (no violations)
-                "violations_found": 0,
-                "violations": [],
-                "is_eligible": True,
-                "reason": "No safety violations found",
-                "check_date": datetime.now().isoformat(),
-                "total_records_checked": len(responses)
-            }
-        
-        # Employee has violations
-        violations_count = len(employee_violations)
-        
-        result = {
-            "employee_name": employee_name,
-            "found_in_kpa": True,
-            "violations_found": violations_count,
-            "violations": employee_violations,
-            "is_eligible": violations_count == 0,
-            "reason": f"{violations_count} safety violation(s) found" if violations_count > 0 else "No safety violations found",
-            "check_date": datetime.now().isoformat(),
-            "total_records_checked": len(responses)
-        }
-        
-        print(f"� Safety check completed: {violations_count} violations found for {employee_name}")
-        return result
-        
-    except Exception as e:
-        print(f"💥 Error during safety check: {str(e)}")
-        return {
-            "employee_name": employee_name,
-            "found_in_kpa": False,
-            "is_eligible": None,
-            "reason": f"Safety check error: {str(e)}",
-            "check_date": datetime.now().isoformat()
-        }
-            "found_in_kpa": True,
-            "violations_found": len(safety_violations),
-            "violations": safety_violations[:5],  # Limit to first 5 for response size
-            "is_eligible": is_eligible,
-            "eligibility_status": "✅ ELIGIBLE" if is_eligible else "❌ NOT ELIGIBLE",
-            "reason": "No safety violations found - eligible for raffle" if is_eligible else f"Found {len(safety_violations)} safety violation(s)",
-            "period_checked": "365 days",
-            "check_date": datetime.now().isoformat(),
-            "response_id_checked": "244699"
-        }
-        
-        print(f"✅ Safety check complete: {result['eligibility_status']}")
-        return result
-        
-    except Exception as e:
-        print(f"💥 Safety check error: {str(e)}")
-        return {
-            "employee_name": employee_name,
-            "found_in_kpa": None,
-            "is_eligible": None,
-            "reason": f"Safety check error: {str(e)}",
-            "check_date": datetime.now().isoformat()
-        }
 
 @app.get("/kpa-photo")
 async def get_kpa_photo(key: str = Query(..., description="KPA photo key")):
@@ -295,7 +170,7 @@ async def check_safety_violations_v2(request_data: dict):
         
         return {
             "employee_name": employee_name,
-            "found_in_kpa": True,  # If we got a response, the system is working
+            "found_in_kpa": True,
             "violations_found": violations_count,
             "violations": employee_violations,
             "is_eligible": violations_count == 0,
